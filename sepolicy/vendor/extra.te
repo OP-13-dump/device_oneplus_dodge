@@ -1,0 +1,34 @@
+allow hal_audio_default vendor_audio_prop:property_service set;
+
+allow hal_bluetooth_default vendor_bt_data_file:dir search;
+allow hal_bluetooth_default vendor_ramdump_vendor_data_file:file unlink;
+
+allow hal_wifi_default persist_vendor_debug_wifi_prop:file read;
+
+allow init debugfs_tracing_debug:dir mounton;
+
+allow nfc vendor_nfc_vendor_data_file:dir search;
+
+allow platform_app bluetooth_finder_prop:file read;
+
+allow priv_app system_data_file:file open;
+
+allow system_app hal_audio_default:binder call;
+allow system_app hal_bootctl_default:binder call;
+allow system_app hal_camera_default:binder call;
+allow system_app hal_contexthub_default:binder call;
+allow system_app hal_fingerprint_default:binder call;
+allow system_app vendor_hal_gnss_qti:binder call;
+
+allow system_server shell:unix_stream_socket getopt;
+allow system_server vendor_proc_oppo_secure_common_file:dir search;
+
+allow untrusted_app cache_file:lnk_file read;
+allow untrusted_app qemu_hw_prop:file read;
+allow untrusted_app qemu_sf_lcd_density_prop:file read;
+
+allow vendor_hal_capabilityconfigstore_qti_default vendor_cap_configstore_dbg_prop:file read;
+
+allow vendor_hal_gnss_qti vendor_pd_locater_dbg_prop:file read;
+
+allow vendor_init vendor_audio_debug_prop:property_service set;

@@ -7,4 +7,14 @@
     <!-- Should we vibrate on an icon animation of the shelf. This should only be active if the
      vibrator is capable of subtle vibrations -->
     <bool name="config_vibrateOnIconAnimation">true</bool>
+
+    <!-- The location of the devices physical tri state switch
+         0: Left side
+         1: Right side -->
+    <integer name="config_alertSliderLocation">0</integer>
+
+    <!-- Tiles native to System UI. Order should match "quick_settings_tiles_default" -->
+    <string name="quick_settings_tiles_stock" translatable="false">
+        internet,wifi,cell,bt,flashlight,dnd,modes_dnd,alarm,airplane,nfc,rotation,battery,controls,wallet,cast,screenrecord,ui_style,mictoggle,cameratoggle,location,hotspot,inversion,saver,dark,work,night,reverse,reduce_brightness,qr_code_scanner,onehanded,color_correction,dream,font_scaling,record_issue,hearing_devices,notes,desktopeffects,ambient_display,aod,caffeine,heads_up,powershare,reading_mode,sync,usb_tether,vpn,sound,cpuinfo,fpsinfo,compass,dataswitch,volume_panel,smartpixels,weather,screenshot,locale,dns,preferred_network
+    </string>
 </resources>

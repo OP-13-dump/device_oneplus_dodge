@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:settings="http://schemas.android.com/apk/res-auto">
+
+    <PreferenceCategory
+        android:key="bypass_charging_category"
+        android:title="@string/bypass_charging_category_title">
+
+        <SwitchPreferenceCompat
+            android:key="bypass_charging"
+            android:title="@string/bypass_charging_title"
+            android:icon="@drawable/ic_bypass_charging"
+            android:summary="@string/bypass_charging_summary"
+            android:persistent="false" />
+
+        <org.lineageos.device.settings.preferences.CustomSeekBarPreference
+            android:key="bypass_charging_target"
+            android:title="@string/bypass_charging_target_title"
+            android:summary="@string/bypass_charging_target_summary"
+            android:icon="@drawable/ic_bypass_waiting"
+            android:defaultValue="1"
+            android:max="99"
+            settings:min="1"
+            settings:interval="1"
+            settings:units="%"
+            settings:showSign="true" />
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        android:title="@string/bypass_charging_app_picker_title"
+        android:key="bypass_charging_applications">
+        <Preference
+            android:key="bypass_charging_add_packages"
+            android:icon="@drawable/ic_add"
+            android:title="@string/add_bypass_charging_package_title" />
+    </PreferenceCategory>
+
+    <com.android.settingslib.widget.FooterPreference
+        android:key="bypass_charging_info"
+        android:title="@string/bypass_charging_info_title"
+        android:selectable="false" />
+
+</PreferenceScreen>
