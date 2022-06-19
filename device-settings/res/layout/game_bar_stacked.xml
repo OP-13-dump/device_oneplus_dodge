@@ -1,0 +1,258 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/game_bar_root"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="@dimen/game_bar_padding"
+    android:background="@drawable/game_bar_background">
+
+    <!-- FPS Row -->
+    <LinearLayout
+        android:id="@+id/fps_row"
+        style="@style/GameBar.Row"
+        android:visibility="gone">
+        <TextView
+            android:id="@+id/fps_label"
+            style="@style/GameBar.Label"
+            android:text="FPS" />
+        <TextView
+            android:id="@+id/fps_value"
+            style="@style/GameBar.Value" />
+    </LinearLayout>
+
+    <!-- BAT row (below FPS) -->
+    <LinearLayout
+        android:id="@+id/battery_temp_row"
+        style="@style/GameBar.Row"
+        android:visibility="gone">
+        <TextView
+            android:id="@+id/battery_temp_label"
+            style="@style/GameBar.Label"
+            android:text="BAT" />
+        <TextView
+            android:id="@+id/battery_temp_value"
+            style="@style/GameBar.Value" />
+    </LinearLayout>
+
+    <!-- RAM row (below BAT) -->
+    <LinearLayout
+        android:id="@+id/ram_row"
+        style="@style/GameBar.Row"
+        android:visibility="gone">
+        <TextView
+            android:id="@+id/ram_label"
+            style="@style/GameBar.Label"
+            android:text="RAM" />
+        <TextView
+            android:id="@+id/ram_value"
+            style="@style/GameBar.Value" />
+    </LinearLayout>
+
+    <!-- Separator: RAM <-> CPU -->
+    <View
+        android:id="@+id/sep_ram_cpu"
+        style="@style/GameBar.Separator"
+        android:visibility="gone" />
+
+    <!-- ===== CPU SECTION ===== -->
+
+    <!-- CPU Section Header (visible only when any CPU data shown) -->
+    <TextView
+        android:id="@+id/cpu_section_header"
+        style="@style/GameBar.SectionHeader"
+        android:text="CPU"
+        android:visibility="gone" />
+
+    <!-- CPU Usage Row -->
+    <LinearLayout
+        android:id="@+id/cpu_usage_row"
+        style="@style/GameBar.Row.CpuCore"
+        android:visibility="gone">
+        <TextView
+            android:id="@+id/cpu_usage_label"
+            style="@style/GameBar.Label.CpuCore"
+            android:text="U" />
+        <TextView
+            android:id="@+id/cpu_usage_value"
+            style="@style/GameBar.Value.CpuFreq" />
+    </LinearLayout>
+
+    <!-- CPU Temperature Row (single full-width right-aligned value) -->
+    <LinearLayout
+        android:id="@+id/cpu_temp_row"
+        style="@style/GameBar.Row.CpuCore"
+        android:visibility="gone">
+        <TextView
+            android:id="@+id/cpu_temp_label"
+            style="@style/GameBar.Label.CpuCore"
+            android:text="T" />
+        <TextView
+            android:id="@+id/cpu_temp_value"
+            style="@style/GameBar.Value.CpuFreq" />
+    </LinearLayout>
+
+    <!-- CPU Frequency Container (per-core frequencies) -->
+    <LinearLayout
+        android:id="@+id/cpu_freq_container"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:id="@+id/cpu0_row"
+            style="@style/GameBar.Row.CpuCore">
+            <TextView
+                android:id="@+id/cpu0_label"
+                style="@style/GameBar.Label.CpuCore"
+                android:text="0" />
+            <TextView
+                android:id="@+id/cpu0_value"
+                style="@style/GameBar.Value.CpuFreq" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/cpu1_row"
+            style="@style/GameBar.Row.CpuCore">
+            <TextView
+                android:id="@+id/cpu1_label"
+                style="@style/GameBar.Label.CpuCore"
+                android:paddingEnd="1.5dp"
+                android:text="1" />
+            <TextView
+                android:id="@+id/cpu1_value"
+                style="@style/GameBar.Value.CpuFreq" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/cpu2_row"
+            style="@style/GameBar.Row.CpuCore">
+            <TextView
+                android:id="@+id/cpu2_label"
+                style="@style/GameBar.Label.CpuCore"
+                android:text="2" />
+            <TextView
+                android:id="@+id/cpu2_value"
+                style="@style/GameBar.Value.CpuFreq" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/cpu3_row"
+            style="@style/GameBar.Row.CpuCore">
+            <TextView
+                android:id="@+id/cpu3_label"
+                style="@style/GameBar.Label.CpuCore"
+                android:text="3" />
+            <TextView
+                android:id="@+id/cpu3_value"
+                style="@style/GameBar.Value.CpuFreq" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/cpu4_row"
+            style="@style/GameBar.Row.CpuCore">
+            <TextView
+                android:id="@+id/cpu4_label"
+                style="@style/GameBar.Label.CpuCore"
+                android:text="4" />
+            <TextView
+                android:id="@+id/cpu4_value"
+                style="@style/GameBar.Value.CpuFreq" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/cpu5_row"
+            style="@style/GameBar.Row.CpuCore">
+            <TextView
+                android:id="@+id/cpu5_label"
+                style="@style/GameBar.Label.CpuCore"
+                android:text="5" />
+            <TextView
+                android:id="@+id/cpu5_value"
+                style="@style/GameBar.Value.CpuFreq" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/cpu6_row"
+            style="@style/GameBar.Row.CpuCore">
+            <TextView
+                android:id="@+id/cpu6_label"
+                style="@style/GameBar.Label.CpuCore"
+                android:text="6" />
+            <TextView
+                android:id="@+id/cpu6_value"
+                style="@style/GameBar.Value.CpuFreq" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/cpu7_row"
+            style="@style/GameBar.Row.CpuCore">
+            <TextView
+                android:id="@+id/cpu7_label"
+                style="@style/GameBar.Label.CpuCore"
+                android:text="7" />
+            <TextView
+                android:id="@+id/cpu7_value"
+                style="@style/GameBar.Value.CpuFreq" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- Separator: CPU <-> GPU -->
+    <View
+        android:id="@+id/sep_cpu_gpu"
+        style="@style/GameBar.Separator"
+        android:visibility="gone" />
+
+    <!-- ===== GPU SECTION ===== -->
+
+    <!-- GPU Section Header (visible only when any GPU data shown) -->
+    <TextView
+        android:id="@+id/gpu_section_header"
+        style="@style/GameBar.SectionHeader"
+        android:text="GPU"
+        android:visibility="gone" />
+
+    <!-- GPU Usage Row -->
+    <LinearLayout
+        android:id="@+id/gpu_usage_row"
+        style="@style/GameBar.Row.CpuCore"
+        android:visibility="gone">
+        <TextView
+            android:id="@+id/gpu_usage_label"
+            style="@style/GameBar.Label.CpuCore"
+            android:text="U" />
+        <TextView
+            android:id="@+id/gpu_usage_value"
+            style="@style/GameBar.Value.CpuFreq" />
+    </LinearLayout>
+
+    <!-- GPU Temperature Row (single full-width right-aligned value) -->
+    <LinearLayout
+        android:id="@+id/gpu_temp_row"
+        style="@style/GameBar.Row.CpuCore"
+        android:visibility="gone">
+        <TextView
+            android:id="@+id/gpu_temp_label"
+            style="@style/GameBar.Label.CpuCore"
+            android:text="T" />
+        <TextView
+            android:id="@+id/gpu_temp_value"
+            style="@style/GameBar.Value.CpuFreq" />
+    </LinearLayout>
+
+    <!-- GPU Clock Row (single full-width right-aligned value) -->
+    <LinearLayout
+        android:id="@+id/gpu_clock_row"
+        style="@style/GameBar.Row.CpuCore"
+        android:visibility="gone">
+        <TextView
+            android:id="@+id/gpu_clock_label"
+            style="@style/GameBar.Label.CpuCore"
+            android:text="F" />
+        <TextView
+            android:id="@+id/gpu_clock_value"
+            style="@style/GameBar.Value.CpuFreq" />
+    </LinearLayout>
+
+</LinearLayout>

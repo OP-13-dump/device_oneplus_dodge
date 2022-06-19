@@ -1,0 +1,233 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+     Copyright (C) 2014-2015 The CyanogenMod Project
+     Copyright (C) 2018 The LineageOS Project
+
+     Licensed under the Apache License, Version 2.0 (the "License");
+     you may not use this file except in compliance with the License.
+     You may obtain a copy of the License at
+
+          http://www.apache.org/licenses/LICENSE-2.0
+
+     Unless required by applicable law or agreed to in writing, software
+     distributed under the License is distributed on an "AS IS" BASIS,
+     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+     See the License for the specific language governing permissions and
+     limitations under the License.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+          xmlns:tools="http://schemas.android.com/tools"
+          android:sharedUserId="android.uid.system"
+          package="org.lineageos.device.settings"
+          android:versionCode="1"
+          android:versionName="1.0" >
+
+    <uses-permission android:name="android.permission.INJECT_EVENTS"/>
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.WRITE_SETTINGS" />
+    <uses-permission android:name="lineageos.permission.HARDWARE_ABSTRACTION_ACCESS" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" />
+
+    <protected-broadcast android:name="org.lineageos.device.settings.UPDATE_SLIDER_SETTINGS" />
+    <protected-broadcast android:name="org.lineageos.device.settings.UPDATE_SLIDER_POSITION" />
+    <protected-broadcast android:name="org.lineageos.device.settings.action.DISPLAY_MODE_CHANGED" />
+
+    <application
+        android:icon="@drawable/ic_logo"
+        android:label="@string/device_title"
+        android:defaultToDeviceProtectedStorage="true"
+        android:directBootAware="true"
+        android:theme="@style/Theme.SubSettingsBase.Expressive"
+        android:exported="true">
+
+        <receiver android:name=".BootCompletedReceiver"
+            android:exported="true"
+            android:enabled="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Main Device Settings Service (always running) -->
+        <service
+            android:name=".DeviceSettingsService"
+            android:enabled="true"
+            android:exported="false" />
+
+        <!-- Device Settings -->
+        <activity
+            android:name=".DeviceSettingsActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.settings.DEVICE_SETTINGS" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+            <!-- <meta-data
+                android:name="com.android.settings.icon"
+                android:resource="@drawable/ic_settings_device" />
+            <meta-data
+                android:name="com.android.settings.category"
+                android:value="com.android.settings.category.ia.homepage" />
+            <meta-data android:name="com.android.settings.summary"
+                android:resource="@string/device_summary" /> -->
+        </activity>
+
+        <service
+            android:name=".KeyHandler"
+            android:permission="KeyHandlerService"
+            android:exported="true" />
+
+        <receiver android:name=".Startup"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="lineageos.intent.action.INITIALIZE_LINEAGE_HARDWARE" />
+            </intent-filter>
+        </receiver>
+
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            tools:replace="android:authorities"/>
+
+        <!-- Search Provider -->
+        <provider
+            android:name=".ConfigPanelSearchIndexablesProvider"
+            android:authorities="org.lineageos.device.settings.provider"
+            android:multiprocess="false"
+            android:grantUriPermissions="true"
+            android:permission="android.permission.READ_SEARCH_INDEXABLES"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.content.action.SEARCH_INDEXABLES_PROVIDER" />
+            </intent-filter>
+        </provider>
+
+        <!-- BypassCharging activity -->
+        <activity android:name=".bypasschrg.BypassChargingActivity"
+            android:label="@string/bypass_charging_title"
+            android:theme="@style/Theme.SubSettingsBase.Expressive"
+            android:exported="true">
+            <meta-data
+                android:name="com.android.settings.summary"
+                android:resource="@string/bypass_charging_summary" />
+        </activity>
+
+        <!-- Bypass charging manager -->
+        <service
+            android:name=".bypasschrg.BypassChargingManager"
+            android:exported="false" />
+
+        <!-- BypassCharging QS Tile -->
+        <service
+            android:name=".bypasschrg.BypassChargingTile"
+            android:label="@string/bypass_charging_title"
+            android:icon="@drawable/ic_bypass_charging"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.service.quicksettings.TOGGLEABLE_TILE"
+                android:value="true" />
+        </service>
+
+        <!-- TileHandler activity -->
+        <activity
+            android:name=".TileHandlerActivity"
+            android:exported="true"
+            android:noHistory="true"
+            android:theme="@android:style/Theme.NoDisplay">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE_PREFERENCES" />
+            </intent-filter>
+        </activity>
+
+        <!-- GameBar Overlay -->
+        <activity
+            android:name=".gamebar.GameBarSettingsActivity"
+            android:label="@string/game_bar_title"
+            android:theme="@style/Theme.SubSettingsBase.Expressive"
+            android:exported="true">
+            <meta-data
+                android:name="com.android.settings.summary"
+                android:resource="@string/game_bar_summary" />
+        </activity>
+
+        <!-- GameBar Overlay Tile Service -->
+        <service
+            android:name=".gamebar.GameBarTileService"
+            android:label="@string/game_bar_tile_label"
+            android:icon="@drawable/ic_game_bar"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.service.quicksettings.TOGGLEABLE_TILE"
+                android:value="true" />
+        </service>
+
+        <!-- GameBar Overlay Monitor Service -->
+        <service
+            android:name=".gamebar.GameBarMonitorService"
+            android:exported="false" />
+
+        <!-- HBM Quick Settings Tile -->
+        <service
+            android:name="org.lineageos.device.settings.display.HbmTile"
+            android:label="@string/hbm_title"
+            android:icon="@drawable/ic_hbm"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
+        <!-- PWM Quick Settings Tile -->
+        <service
+            android:name="org.lineageos.device.settings.display.PwmTile"
+            android:label="@string/onepulse_pwm_mode_title"
+            android:icon="@drawable/ic_pwm"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
+        <!-- Refresh rate activity -->
+        <activity android:name=".refreshrate.RefreshRateActivity"
+            android:label="@string/refresh_rate_app_title"
+            android:theme="@style/Theme.SubSettingsBase.Expressive"
+            android:exported="true">
+            <meta-data
+                android:name="com.android.settings.summary"
+                android:resource="@string/refresh_rate_app_summary" />
+        </activity>
+
+        <!-- Refresh Rate Monitor Service -->
+        <service
+            android:name=".refreshrate.RefreshRateMonitorService"
+            android:enabled="true"
+            android:exported="false" />
+
+        <!-- Refresh Rate QS Tile Service -->
+        <service
+            android:name=".refreshrate.RefreshRateTile"
+            android:icon="@drawable/ic_refresh_rate"
+            android:label="@string/refresh_rate_title"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+    </application>
+</manifest>

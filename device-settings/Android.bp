@@ -1,0 +1,37 @@
+//
+// Copyright (C) 2017-2022 The LineageOS Project
+//
+// SPDX-License-Identifier: Apache-2.0
+//
+
+android_app {
+    name: "DeviceSettings",
+
+    srcs: ["src/**/*.java"],
+    resource_dirs: ["res"],
+    certificate: "platform",
+    platform_apis: true,
+    system_ext_specific: true,
+    privileged: true,
+    init_rc: ["init.device.settings.rc"],
+
+    static_libs: [
+        "SettingsLib",
+        "org.lineageos.platform.internal",
+    ],
+
+    required: [
+        "privapp-permissions-device_settings.xml",
+    ],
+
+    optimize: {
+        proguard_flags_files: ["proguard.flags"],
+    },
+}
+
+prebuilt_etc {
+    name: "privapp-permissions-device_settings.xml",
+    src: "privapp-permissions-device_settings.xml",
+    sub_dir: "permissions",
+    system_ext_specific: true,
+}
