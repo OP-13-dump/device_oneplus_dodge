@@ -1,0 +1,269 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Copyright (C) 2016-2023 crDroid Android Project
+
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+-->
+<resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
+    <string name="device_title">OnePlus Settings</string>
+    <string name="device_summary">Extra settings for OnePlus Ace3 | 12R</string>
+
+    <!-- Notification slider -->
+    <string name="notification_slider_category_title">Alert slider</string>
+    <string name="notification_slider_title">Alert slider settings</string>
+    <string name="notification_slider_selection_dialog_title">Action</string>
+    <string name="notification_slider_top_position">Top position</string>
+    <string name="notification_slider_middle_position">Middle position</string>
+    <string name="notification_slider_bottom_position">Bottom position</string>
+    <string name="notification_slider_mode_total_silence">Total silence</string>
+    <string name="notification_slider_mode_alarms_only">Alarms only</string>
+    <string name="notification_slider_mode_priority_only">Priority only</string>
+    <string name="notification_slider_mode_none">All</string>
+    <string name="notification_slider_usage_title">Use slider for</string>
+    <string name="notification_slider_for_notification">Notification</string>
+    <string name="notification_slider_for_flashlight">Flashlight</string>
+    <string name="notification_slider_for_brightness">Brightness</string>
+    <string name="notification_slider_for_rotation">Rotation</string>
+    <string name="notification_slider_for_ringer">Ringer</string>
+    <string name="notification_slider_for_notification_ringer">Notification and ringer</string>
+    <string name="notification_slider_flashlight_off">Off</string>
+    <string name="notification_slider_flashlight_on">On</string>
+    <string name="notification_slider_flashlight_blink">Blink</string>
+    <string name="notification_slider_brightness_auto">Auto</string>
+    <string name="notification_slider_brightness_brightest">Brightest</string>
+    <string name="notification_slider_brightness_darkest">Darkest</string>
+    <string name="notification_slider_rotation_auto">Auto</string>
+    <string name="notification_slider_rotation_portrait">Portrait</string>
+    <string name="notification_slider_rotation_landscape_90">Landscape (90°)</string>
+    <string name="notification_slider_rotation_landscape_270">Landscape (270°)</string>
+    <string name="notification_slider_ringer_normal">Normal</string>
+    <string name="notification_slider_ringer_vibrate">Vibrate</string>
+    <string name="notification_slider_ringer_silent">Silent</string>
+
+    <!-- Gaming category -->
+    <string name="gaming_category_title">Gaming</string>
+    <string name="gaming_category_summary">Extra settings for gamers</string>
+
+    <!-- Bypass chargings -->
+    <string name="bypass_charging_category_title" translatable="false">@string/bypass_charging_title</string>
+    <string name="bypass_charging_title">Bypass charging</string>
+    <string name="bypass_charging_summary">Supply power directly to the phone</string>
+    <string name="bypass_charging_info_title">Bypass charging supplies power directly to the board, instead of the battery, helping to reduce device heat, when running demanding applications like games.</string>
+    <string name="bypass_charging_unavailable">Bypass charging is not supported on this device</string>
+    <string name="bypass_charging_enabled">Enabled</string>
+    <string name="bypass_charging_disabled">Disabled</string>
+    <string name="bypass_charging_error">It was not possible to change Bypass Charging status. Please, try again later.</string>
+    <string name="bypass_charging_target_title">Target level</string>
+    <string name="bypass_charging_target_summary">Battery will charge until it reaches target level, then bypass charging will be activated.</string>
+    <string name="bypass_charging_waiting">Waiting for target level</string>
+    <string name="bypass_charging_waiting_for_target">Waiting to reach %d%%</string>
+    <string name="bypass_charging_waiting_for_app">Waiting to reach %2$d%% for %1$s</string>
+    <string name="bypass_charging_waiting_for_app_fallback">Waiting to reach %d%% for app</string>
+    <string name="bypass_charging_progress">Charging: %1$d%% / %2$d%%</string>
+    <string name="bypass_charging_progress_for_app">Charging for %3$s: %1$d%% / %2$d%%</string>
+    <string name="bypass_charging_progress_for_app_fallback">Charging for app: %1$d%% / %2$d%%</string>
+    <string name="bypass_charging_app_picker_title">Auto-enable bypass charging for the following apps</string>
+    <string name="add_bypass_charging_package_title">Add app to the bypass list</string>
+    <string name="bypass_app_monitor_title">Bypass charging monitor service</string>
+    <string name="bypass_app_monitor_desc">Checking if bypass charging should be enabled for currently active app</string>
+    <!-- Bypass notification text -->
+    <string name="bypass_notif_idle">Status: idle</string>
+    <!-- Global ON -->
+    <string name="bypass_notif_global_on">
+    Status: on&#10;Bypass mode: global
+    </string>
+    <!-- Global WAITING: args = target, current -->
+    <string name="bypass_notif_global_waiting">
+    Status: waiting for target&#10;Target: %1$d%%&#10;Current battery level: %2$d%%&#10;Bypass mode: global
+    </string>
+    <!-- App list present but no bypass app in foreground -->
+    <string name="bypass_notif_waiting_app">
+    Status: waiting for app&#10;Bypass mode: bypass list
+    </string>
+    <!-- App WAITING: args = appLabel, target, current -->
+    <string name="bypass_notif_app_waiting">
+    Status: waiting for target for %1$s&#10;Target: %2$d%%&#10;Current battery level: %3$d%%&#10;Bypass mode: bypass list
+    </string>
+    <!-- App ON: args = appLabel -->
+    <string name="bypass_notif_app_on">
+    Status: on for %1$s&#10;Bypass mode: bypass list
+    </string>
+    <!-- Bypass charging manager notification lines -->
+    <string name="bc_status_on">Status: on</string>
+    <string name="bc_status_waiting_for_target">Status: waiting for target</string>
+    <string name="bc_status_waiting_for_target_for_app">Status: waiting for target for %1$s</string>
+    <string name="bc_status_on_for_app">Status: on for %1$s</string>
+    <string name="bc_status_waiting_for_app">Status: waiting for app</string>
+    <string name="bc_status_idle">Status: idle</string>
+    <string name="bc_target_with_value">Target: %1$d%%</string>
+    <string name="bc_current_level_with_value">Current battery level: %1$d%%</string>
+    <string name="bc_mode_global">Bypass mode: global</string>
+    <string name="bc_mode_list">Bypass mode: bypass list</string>
+
+    <!-- Custom seekbar -->
+    <string name="custom_seekbar_value">Value: <xliff:g id="v">%s</xliff:g></string>
+    <string name="custom_seekbar_default_value">by default</string>
+    <string name="custom_seekbar_default_value_to_set">Default value: <xliff:g id="v">%s</xliff:g>\nLong tap to set</string>
+    <string name="custom_seekbar_default_value_is_set">Default value is set</string>
+
+    <!-- GameBar -->
+    <string name="game_bar_title">GameBar</string>
+    <string name="game_bar_summary">Enable the system overlay (FPS, Temp, etc.)</string>
+    <string name="overlay_permission_required">Overlay permission is required</string>
+    <string name="overlay_permission_granted">Overlay permission granted</string>
+    <string name="overlay_permission_denied">Overlay permission denied</string>
+    <string name="game_bar_tile_label">GameBar</string>
+    <string name="game_bar_tile_description">Toggle the game overlay</string>
+    <string name="game_bar_overlay_features_title">Overlay Features</string>
+    <string name="game_bar_enable">Enable GameBar Overlay</string>
+    <string name="game_bar_enable_summary">Show performance metrics overlay in-game</string>
+    <string name="game_bar_stats_display">Stats Display</string>
+    <string name="game_bar_fps_enable">FPS</string>
+    <string name="game_bar_fps_enable_summary">Show current frames per second</string>
+    <string name="game_bar_fps_method_title">FPS Measurement Method</string>
+    <string name="game_bar_fps_method_select_title">Select FPS Method</string>
+    <string name="game_bar_fps_method_select_summary">Choose between the New API method (default) and Legacy Sysfs</string>
+    <string name="game_bar_temp_enable">Battery Temperature</string>
+    <string name="game_bar_temp_enable_summary">Show device battery temperature</string>
+    <string name="game_bar_cpu_usage_enable">CPU Usage</string>
+    <string name="game_bar_cpu_usage_enable_summary">Show CPU usage percentage</string>
+    <string name="game_bar_cpu_clock_enable">CPU Clock Speeds</string>
+    <string name="game_bar_cpu_clock_enable_summary">Show CPU clock speeds for each core</string>
+    <string name="game_bar_cpu_temp_enable">CPU Temperature</string>
+    <string name="game_bar_cpu_temp_enable_summary">Show CPU temperature from thermal zone</string>
+    <string name="game_bar_ram_enable">RAM Usage</string>
+    <string name="game_bar_ram_enable_summary">Show RAM usage in MB</string>
+    <string name="game_bar_gpu_usage_enable">GPU Usage</string>
+    <string name="game_bar_gpu_usage_enable_summary">Show GPU usage percentage</string>
+    <string name="game_bar_gpu_clock_enable">GPU Clock Speed</string>
+    <string name="game_bar_gpu_clock_enable_summary">Show current GPU frequency</string>
+    <string name="game_bar_gpu_temp_enable">GPU Temperature</string>
+    <string name="game_bar_gpu_temp_enable_summary">Show GPU temperature</string>
+    <string name="game_bar_customization_title">Customization</string>
+    <string name="game_bar_ui_customization">UI Customization</string>
+    <string name="game_bar_position">Overlay Position</string>
+    <string name="game_bar_position_summary">Select where the overlay appears on screen</string>
+    <string name="game_bar_reset_position">Reset Position</string>
+    <string name="game_bar_reset_position_summary">Return overlay to top-left corner</string>
+    <string name="game_bar_split_mode">Layout Mode</string>
+    <string name="game_bar_split_config_title">Split Config</string>
+    <string name="game_bar_split_mode_summary">Choose how stats are arranged (Stacked or Side-by-Side)</string>
+    <string name="game_bar_text_size">Text Size</string>
+    <string name="game_bar_text_size_summary">Adjust overlay text size (toggle overlay to preview)</string>
+    <string name="game_bar_background_alpha">Background Transparency</string>
+    <string name="game_bar_background_alpha_summary">Adjust overlay background opacity (0-100%)</string>
+    <string name="game_bar_corner_radius">Corner Radius</string>
+    <string name="game_bar_corner_radius_summary">Adjust how rounded overlay corners are</string>
+    <string name="game_bar_padding">Padding</string>
+    <string name="game_bar_padding_summary">Adjust space around stats</string>
+    <string name="game_bar_item_spacing">Item Spacing</string>
+    <string name="game_bar_item_spacing_summary">Adjust spacing between stat lines</string>
+    <string name="game_bar_title_color">Title Color</string>
+    <string name="game_bar_title_color_summary">Color for the labels</string>
+    <string name="game_bar_value_color">Value Color</string>
+    <string name="game_bar_value_color_summary">Color for the numeric values</string>
+    <string name="game_bar_update_interval">Update Interval</string>
+    <string name="game_bar_update_interval_summary">How often overlay refreshes values (milliseconds)</string>
+    <string name="game_bar_gesture_title">Overlay Gesture Controls</string>
+    <string name="game_bar_gestures">Gesture Controls</string>
+    <string name="game_bar_single_tap_toggle">Single Tap Toggle</string>
+    <string name="game_bar_single_tap_toggle_summary">Tap overlay to switch between stacked and side-by-side layout</string>
+    <string name="game_bar_doubletap_capture">Double Tap Capture</string>
+    <string name="game_bar_doubletap_capture_summary">Double-tap overlay to start/stop capture logs</string>
+    <string name="game_bar_longpress_enable">Long Press Settings</string>
+    <string name="game_bar_longpress_enable_summary">Long-press overlay to open GameBar settings</string>
+    <string name="game_bar_longpress_timeout">Long Press Duration</string>
+    <string name="game_bar_longpress_timeout_summary">How long to hold before settings open (milliseconds)</string>
+    <string name="game_bar_capture_title">Capture Logs</string>
+    <string name="game_bar_data_capture">Data Capture</string>
+    <string name="game_bar_capture_start">Start Logging</string>
+    <string name="game_bar_capture_start_summary">Begin capturing FPS and performance metrics</string>
+    <string name="game_bar_capture_stop">Stop Logging</string>
+    <string name="game_bar_capture_stop_summary">Stop capturing performance data</string>
+    <string name="game_bar_capture_export">Export Log Data</string>
+    <string name="game_bar_capture_export_summary">Save captured data as CSV file</string>
+    <string name="game_bar_auto_enable_title">Auto-Enable Apps for GameBar</string>
+    <string name="game_bar_add_packages_summary">Add apps that should auto-enable GameBar</string>
+    <string name="game_bar_applications">Applications</string>
+    <string name="game_bar_position_top_left">Top Left</string>
+    <string name="game_bar_position_top_center">Top Center</string>
+    <string name="game_bar_position_top_right">Top Right</string>
+    <string name="game_bar_position_bottom_left">Bottom Left</string>
+    <string name="game_bar_position_bottom_center">Bottom Center</string>
+    <string name="game_bar_position_bottom_right">Bottom Right</string>
+    <string name="game_bar_position_draggable">Draggable</string>
+    <string name="game_bar_split_mode_stacked">Stacked (Vertical)</string>
+    <string name="game_bar_split_mode_side_by_side">Side-by-Side (Horizontal)</string>
+    <string name="game_bar_color_white">White</string>
+    <string name="game_bar_color_black">Black</string>
+    <string name="game_bar_color_red">Red</string>
+    <string name="game_bar_color_green">Green</string>
+    <string name="game_bar_color_blue">Blue</string>
+    <string name="game_bar_color_yellow">Yellow</string>
+    <string name="game_bar_color_cyan">Cyan</string>
+    <string name="game_bar_color_magenta">Magenta</string>
+    <string name="game_bar_color_light_gray">Light Gray</string>
+    <string name="game_bar_color_dark_gray">Dark Gray</string>
+    <string name="game_bar_update_interval_fast">500ms (Fast)</string>
+    <string name="game_bar_update_interval_normal">1000ms (Normal)</string>
+    <string name="game_bar_update_interval_slow">2000ms (Slow)</string>
+    <string name="game_bar_update_interval_very_slow">3000ms (Very Slow)</string>
+    <string name="game_bar_longpress_timeout_very_fast">500ms (Very Fast)</string>
+    <string name="game_bar_longpress_timeout_fast">1000ms (Fast)</string>
+    <string name="game_bar_longpress_timeout_normal">1500ms (Normal)</string>
+    <string name="game_bar_longpress_timeout_slow">2000ms (Slow)</string>
+
+    <!-- Display -->
+    <string name="display_category_title">Display</string>
+
+    <!-- One-Pulse PWM (Classic) mode -->
+    <string name="onepulse_pwm_mode_title">One-Pulse PWM</string>
+    <string name="onepulse_pwm_mode_summary">Enable One-Pulse (high frequency) PWM to reduce display flicker at mid or high brightness levels</string>
+
+    <!-- HBM -->
+    <string name="hbm_category_title" translatable="false">@string/hbm_title</string>
+    <string name="hbm_title">HBM</string>
+    <string name="hbm_summary">High Brightness Mode</string>
+    <string name="hbm_unavailable">High Brightness Mode is not supported on this device</string>
+    <string name="hbm_warning_title">Warning</string>
+    <string name="hbm_warning_summary">HBM accelerates cumulative panel degradation. So use it only when necessary and for short periods of time.\n</string>
+    <string name="hbm_btn_enable">Enable</string>
+    <string name="hbm_warning_dont_show_again">Don\'t show this warning again</string>
+
+    <!-- Refresh Rate Settings -->
+    <string name="refresh_rate_title">Refresh rate</string>
+    <string name="refresh_rate_app_title">Per-App Refresh Rate</string>
+    <string name="refresh_rate_app_summary">Customize refresh rate per application</string>
+    <string name="refresh_rate_settings">Display Refresh Rate</string>
+    <string name="refresh_rate_global_title">Global Refresh Rate</string>
+    <string name="refresh_rate_global_summary">Default refresh rate for all apps</string>
+    <string name="refresh_rate_overrides_title">Per-App Overrides</string>
+    <string name="refresh_rate_app_title_dialog">Select Refresh Rate</string>
+    <string name="no_app_overrides">No app-specific overrides configured</string>
+    <string name="refresh_rate_auto">Auto</string>
+    <string name="refresh_rate_60hz" translatable="false"> 60 Hz</string>
+    <string name="refresh_rate_90hz" translatable="false"> 90 Hz</string>
+    <string name="refresh_rate_120hz" translatable="false">120 Hz</string>
+
+    <!-- HBM/PWM/RefreshRate tile messages -->
+    <string name="hbm_unavailable_pwm_active">PWM is active</string>
+    <string name="refresh_rate_locked_hbm">Locked at 90Hz (HBM)</string>
+
+    <!-- Generic -->
+    <string name="delete">Delete</string>
+    <string name="delete_message">Remove selected item?</string>
+    <string name="add_app">Add Application</string>
+    <string name="on">On</string>
+    <string name="off">Off</string>
+
+</resources>

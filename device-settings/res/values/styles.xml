@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- root marker style -->
+    <style name="GameBar" />
+
+    <!-- Section header style (CPU, GPU) -->
+    <style name="GameBar.SectionHeader">
+        <item name="android:layout_width">@dimen/game_bar_row_width</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:textSize">@dimen/game_bar_section_header_text_size</item>
+        <item name="android:textColor">#FFFFFF</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:maxLines">1</item>
+        <item name="android:gravity">start|center_vertical</item>
+        <item name="android:includeFontPadding">false</item>
+        <item name="android:layout_marginTop">@dimen/game_bar_margin_small</item>
+        <item name="android:layout_marginBottom">@dimen/game_bar_margin_xsmall</item>
+    </style>
+
+    <!-- Common style for all labels (FPS, RAM, BAT) -->
+    <style name="GameBar.Label">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:textSize">@dimen/game_bar_text_size</item>
+        <item name="android:textColor">#FFFFFF</item>
+        <item name="android:maxLines">1</item>
+        <item name="android:ellipsize">end</item>
+        <item name="android:gravity">start|center_vertical</item>
+        <item name="android:includeFontPadding">false</item>
+    </style>
+
+    <!-- Common style for all values (aligned right, weight-based column) -->
+    <style name="GameBar.Value">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:textSize">@dimen/game_bar_text_size</item>
+        <item name="android:textColor">#4CAF50</item>
+        <item name="android:typeface">monospace</item>
+        <item name="android:maxLines">1</item>
+        <item name="android:ellipsize">end</item>
+        <item name="android:gravity">end|center_vertical</item>
+        <item name="android:textAlignment">viewEnd</item>
+        <item name="android:includeFontPadding">false</item>
+        <!-- defensive: ensure end-padding/margin don't interfere -->
+        <item name="android:layout_marginEnd">0dp</item>
+        <item name="android:paddingEnd">0dp</item>
+    </style>
+
+    <!-- Style for CPU core labels (0, 1, 2, etc.) -->
+    <style name="GameBar.Label.CpuCore">
+        <item name="android:layout_width">@dimen/game_bar_cpu_label_width</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_weight">0</item>
+        <item name="android:gravity">end|center_vertical</item>
+        <item name="android:includeFontPadding">false</item>
+        <item name="android:textSize">@dimen/game_bar_text_size_small</item>
+    </style>
+
+    <!-- Style for CPU core frequency values -->
+    <style name="GameBar.Value.CpuFreq" parent="GameBar.Value">
+        <item name="android:layout_marginStart">@dimen/game_bar_value_margin_start</item>
+        <item name="android:layout_marginEnd">0dp</item>
+        <item name="android:paddingEnd">0dp</item>
+        <item name="android:typeface">monospace</item>
+    </style>
+
+    <!-- (no label, full width, right-aligned) - uses weight so it aligns with other values -->
+    <style name="GameBar.Value.FullWidth" parent="GameBar.Value" >
+        <!-- inherits weight behavior from GameBar.Value -->
+    </style>
+
+    <!-- Style for rows (horizontal LinearLayouts) -->
+    <style name="GameBar.Row">
+        <item name="android:layout_width">@dimen/game_bar_row_width</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:orientation">horizontal</item>
+        <item name="android:gravity">center_vertical</item>
+        <item name="android:layout_marginTop">@dimen/game_bar_margin_small</item>
+        <item name="android:layout_marginBottom">@dimen/game_bar_margin_small</item>
+    </style>
+
+    <!-- CPU core rows extend the base and only override/add what differs -->
+    <style name="GameBar.Row.CpuCore" parent="GameBar.Row">
+        <item name="android:layout_marginTop">@dimen/game_bar_margin_xsmall</item>
+        <item name="android:layout_marginBottom">@dimen/game_bar_margin_xsmall</item>
+        <item name="android:paddingStart">@dimen/game_bar_cpu_padding_start</item>
+        <item name="android:paddingEnd">0dp</item>
+    </style>
+
+    <!-- Style for indented rows (GPU clock, CPU/GPU temp) -->
+    <style name="GameBar.Row.Indented" parent="GameBar.Row">
+        <item name="android:paddingStart">@dimen/game_bar_cpu_padding_start</item>
+        <item name="android:paddingEnd">0dp</item>
+        <item name="android:layout_marginTop">@dimen/game_bar_margin_xsmall</item>
+        <item name="android:layout_marginBottom">@dimen/game_bar_margin_xsmall</item>
+    </style>
+
+    <!-- thin divider between groups -->
+    <style name="GameBar.Separator">
+        <item name="android:layout_width">@dimen/game_bar_row_width</item>
+        <item name="android:layout_height">@dimen/game_bar_separator_height</item>
+        <item name="android:layout_marginTop">@dimen/game_bar_separator_margin</item>
+        <item name="android:layout_marginBottom">@dimen/game_bar_separator_margin</item>
+        <item name="android:background">#33FFFFFF</item>
+    </style>
+
+    <!-- Tile dialog theme -->
+    <style name="Theme.DeviceSettings.Dialog">
+        <item name="android:windowIsFloating">true</item>
+        <item name="android:windowIsTranslucent">false</item>
+        <item name="android:windowMinWidthMajor">60%</item>
+        <item name="android:windowMinWidthMinor">60%</item>
+        <item name="android:windowFullscreen">false</item>
+    </style>
+
+</resources>

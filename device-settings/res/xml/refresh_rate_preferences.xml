@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ~ SPDX-FileCopyrightText: 2025 AlphaDroid
+  ~ SPDX-License-Identifier: Apache-2.0
+-->
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <PreferenceCategory android:title="@string/refresh_rate_settings">
+
+        <ListPreference
+            android:key="refresh_rate_mode"
+            android:icon="@drawable/ic_refresh_rate"
+            android:title="@string/refresh_rate_global_title"
+            android:summary="@string/refresh_rate_global_summary"
+            android:entries="@array/refresh_rate_entries"
+            android:entryValues="@array/refresh_rate_values"
+            android:defaultValue="60" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        android:key="refresh_rate_applications"
+        android:title="@string/refresh_rate_overrides_title">
+
+        <Preference
+            android:key="refresh_rate_add_packages"
+            android:icon="@drawable/ic_add"
+            android:title="@string/add_app"
+            android:summary="@string/no_app_overrides" />
+
+    </PreferenceCategory>
+
+</PreferenceScreen>
