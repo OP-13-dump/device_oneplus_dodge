@@ -1,0 +1,247 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Copyright (C) 2025 kenway214
+    Copyright (C) 2025 AlphaDroid
+
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+         http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+-->
+
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:settings="http://schemas.android.com/apk/res/org.lineageos.device.settings">
+
+    <!-- Master Enable -->
+    <SwitchPreferenceCompat
+        android:key="game_bar_enable"
+        android:title="@string/game_bar_enable"
+        android:summary="@string/game_bar_enable_summary"
+        android:defaultValue="false" />
+
+    <!-- Applications -->
+    <PreferenceCategory
+        android:key="game_bar_applications"
+        android:title="@string/game_bar_applications" />
+
+    <Preference
+        android:key="game_bar_add_packages"
+        android:icon="@drawable/ic_add"
+        android:title="@string/add_app"
+        android:summary="@string/game_bar_add_packages_summary" />
+
+    <!-- Stats Display -->
+    <PreferenceCategory
+        android:title="@string/game_bar_stats_display">
+
+        <SwitchPreferenceCompat
+            android:key="game_bar_fps_enable"
+            android:title="@string/game_bar_fps_enable"
+            android:summary="@string/game_bar_fps_enable_summary"
+            android:defaultValue="false" />
+
+        <SwitchPreferenceCompat
+            android:key="game_bar_temp_enable"
+            android:title="@string/game_bar_temp_enable"
+            android:summary="@string/game_bar_temp_enable_summary"
+            android:defaultValue="false" />
+
+        <SwitchPreferenceCompat
+            android:key="game_bar_cpu_usage_enable"
+            android:title="@string/game_bar_cpu_usage_enable"
+            android:summary="@string/game_bar_cpu_usage_enable_summary"
+            android:defaultValue="false" />
+
+        <SwitchPreferenceCompat
+            android:key="game_bar_cpu_clock_enable"
+            android:title="@string/game_bar_cpu_clock_enable"
+            android:summary="@string/game_bar_cpu_clock_enable_summary"
+            android:defaultValue="false" />
+
+        <SwitchPreferenceCompat
+            android:key="game_bar_cpu_temp_enable"
+            android:title="@string/game_bar_cpu_temp_enable"
+            android:summary="@string/game_bar_cpu_temp_enable_summary"
+            android:defaultValue="false" />
+
+        <SwitchPreferenceCompat
+            android:key="game_bar_ram_enable"
+            android:title="@string/game_bar_ram_enable"
+            android:summary="@string/game_bar_ram_enable_summary"
+            android:defaultValue="false" />
+
+        <SwitchPreferenceCompat
+            android:key="game_bar_gpu_usage_enable"
+            android:title="@string/game_bar_gpu_usage_enable"
+            android:summary="@string/game_bar_gpu_usage_enable_summary"
+            android:defaultValue="false" />
+
+        <SwitchPreferenceCompat
+            android:key="game_bar_gpu_clock_enable"
+            android:title="@string/game_bar_gpu_clock_enable"
+            android:summary="@string/game_bar_gpu_clock_enable_summary"
+            android:defaultValue="false" />
+
+        <SwitchPreferenceCompat
+            android:key="game_bar_gpu_temp_enable"
+            android:title="@string/game_bar_gpu_temp_enable"
+            android:summary="@string/game_bar_gpu_temp_enable_summary"
+            android:defaultValue="false" />
+    </PreferenceCategory>
+
+    <!-- UI Customization -->
+    <PreferenceCategory
+        android:title="@string/game_bar_ui_customization">
+
+        <ListPreference
+            android:key="game_bar_position"
+            android:title="@string/game_bar_position"
+            android:summary="@string/game_bar_position_summary"
+            android:defaultValue="top_left"
+            android:entries="@array/game_bar_position_entries"
+            android:entryValues="@array/game_bar_position_values" />
+
+        <Preference
+            android:key="game_bar_reset_position"
+            android:title="@string/game_bar_reset_position"
+            android:summary="@string/game_bar_reset_position_summary" />
+
+        <ListPreference
+            android:key="game_bar_split_mode"
+            android:title="@string/game_bar_split_mode"
+            android:summary="@string/game_bar_split_mode_summary"
+            android:defaultValue="stacked"
+            android:entries="@array/game_bar_split_mode_entries"
+            android:entryValues="@array/game_bar_split_mode_values" />
+
+        <org.lineageos.device.settings.preferences.CustomSeekBarPreference
+            android:key="game_bar_text_size"
+            android:title="@string/game_bar_text_size"
+            android:summary="@string/game_bar_text_size_summary"
+            android:defaultValue="16"
+            android:max="24"
+            settings:min="10"
+            settings:interval="1" />
+
+        <org.lineageos.device.settings.preferences.CustomSeekBarPreference
+            android:key="game_bar_background_alpha"
+            android:title="@string/game_bar_background_alpha"
+            android:summary="@string/game_bar_background_alpha_summary"
+            android:defaultValue="128"
+            android:max="255"
+            settings:min="0"
+            settings:interval="1" />
+
+        <org.lineageos.device.settings.preferences.CustomSeekBarPreference
+            android:key="game_bar_corner_radius"
+            android:title="@string/game_bar_corner_radius"
+            android:summary="@string/game_bar_corner_radius_summary"
+            android:defaultValue="16"
+            android:max="32"
+            settings:min="0"
+            settings:interval="1" />
+
+        <org.lineageos.device.settings.preferences.CustomSeekBarPreference
+            android:key="game_bar_padding"
+            android:title="@string/game_bar_padding"
+            android:summary="@string/game_bar_padding_summary"
+            android:defaultValue="12"
+            android:max="24"
+            settings:min="4"
+            settings:interval="1" />
+
+        <org.lineageos.device.settings.preferences.CustomSeekBarPreference
+            android:key="game_bar_item_spacing"
+            android:title="@string/game_bar_item_spacing"
+            android:summary="@string/game_bar_item_spacing_summary"
+            android:defaultValue="8"
+            android:max="16"
+            settings:min="0"
+            settings:interval="1" />
+
+        <ListPreference
+            android:key="game_bar_title_color"
+            android:title="@string/game_bar_title_color"
+            android:summary="@string/game_bar_title_color_summary"
+            android:defaultValue="#FFFFFF"
+            android:entries="@array/game_bar_color_entries"
+            android:entryValues="@array/game_bar_color_values" />
+
+        <ListPreference
+            android:key="game_bar_value_color"
+            android:title="@string/game_bar_value_color"
+            android:summary="@string/game_bar_value_color_summary"
+            android:defaultValue="#4CAF50"
+            android:entries="@array/game_bar_color_entries"
+            android:entryValues="@array/game_bar_color_values" />
+
+        <ListPreference
+            android:key="game_bar_update_interval"
+            android:title="@string/game_bar_update_interval"
+            android:summary="@string/game_bar_update_interval_summary"
+            android:defaultValue="1000"
+            android:entries="@array/game_bar_update_interval_entries"
+            android:entryValues="@array/game_bar_update_interval_values" />
+    </PreferenceCategory>
+
+    <!-- Gestures -->
+    <PreferenceCategory
+        android:title="@string/game_bar_gestures">
+
+        <SwitchPreferenceCompat
+            android:key="game_bar_single_tap_toggle"
+            android:title="@string/game_bar_single_tap_toggle"
+            android:summary="@string/game_bar_single_tap_toggle_summary"
+            android:defaultValue="false" />
+
+        <SwitchPreferenceCompat
+            android:key="game_bar_doubletap_capture"
+            android:title="@string/game_bar_doubletap_capture"
+            android:summary="@string/game_bar_doubletap_capture_summary"
+            android:defaultValue="false" />
+
+        <SwitchPreferenceCompat
+            android:key="game_bar_longpress_enable"
+            android:title="@string/game_bar_longpress_enable"
+            android:summary="@string/game_bar_longpress_enable_summary"
+            android:defaultValue="false" />
+
+        <ListPreference
+            android:key="game_bar_longpress_timeout"
+            android:title="@string/game_bar_longpress_timeout"
+            android:summary="@string/game_bar_longpress_timeout_summary"
+            android:defaultValue="1000"
+            android:entries="@array/game_bar_longpress_timeout_entries"
+            android:entryValues="@array/game_bar_longpress_timeout_values"
+            android:dependency="game_bar_longpress_enable" />
+    </PreferenceCategory>
+
+    <!-- Data Capture -->
+    <PreferenceCategory
+        android:title="@string/game_bar_data_capture">
+
+        <Preference
+            android:key="game_bar_capture_start"
+            android:title="@string/game_bar_capture_start"
+            android:summary="@string/game_bar_capture_start_summary" />
+
+        <Preference
+            android:key="game_bar_capture_stop"
+            android:title="@string/game_bar_capture_stop"
+            android:summary="@string/game_bar_capture_stop_summary" />
+
+        <Preference
+            android:key="game_bar_capture_export"
+            android:title="@string/game_bar_capture_export"
+            android:summary="@string/game_bar_capture_export_summary" />
+    </PreferenceCategory>
+
+</PreferenceScreen>
