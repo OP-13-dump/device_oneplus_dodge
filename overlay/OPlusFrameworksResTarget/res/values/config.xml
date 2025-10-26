@@ -4,9 +4,12 @@
      SPDX-License-Identifier: Apache-2.0
 -->
 <resources>
+<<<<<<< HEAD
     <!-- Whether or not wcg mode should be enabled on this device -->
     <bool name="config_enableWcgMode">true</bool>
 
+=======
+>>>>>>> bbfd16f (dodge: attempt to setup automatic color management)
     <!-- Indicate available ColorDisplayManager.COLOR_MODE_xxx. -->
     <integer-array name="config_availableColorModes">
         <item>0</item> <!-- Natural -->
@@ -38,7 +41,7 @@
         <item>0</item> <!-- COLOR_MODE_DEFAULT -->
         <item>9</item> <!-- COLOR_MODE_DISPLAY_P3 -->
     </integer-array>
-
+    
     <!-- Power Management: Specifies whether to decouple the auto-suspend state of the
          device from the display on/off state.
 
@@ -58,7 +61,6 @@
          Refer to autosuspend.h for details.
     -->
     <bool name="config_powerDecoupleAutoSuspendModeFromDisplay">true</bool>
-
     <!-- Flag indicating whether we should enable the automatic brightness.
          Software implementation will be used if config_hardware_auto_brightness_available is not set -->
     <bool name="config_automatic_brightness_available">true</bool>
