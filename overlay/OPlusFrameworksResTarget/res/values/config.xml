@@ -4,12 +4,9 @@
      SPDX-License-Identifier: Apache-2.0
 -->
 <resources>
-<<<<<<< HEAD
     <!-- Whether or not wcg mode should be enabled on this device -->
     <bool name="config_enableWcgMode">true</bool>
 
-=======
->>>>>>> bbfd16f (dodge: attempt to setup automatic color management)
     <!-- Indicate available ColorDisplayManager.COLOR_MODE_xxx. -->
     <integer-array name="config_availableColorModes">
         <item>0</item> <!-- Natural -->
