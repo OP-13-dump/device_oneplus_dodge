@@ -41,7 +41,6 @@
     
     <!-- Power Management: Specifies whether to decouple the auto-suspend state of the
          device from the display on/off state.
-
          When false, autosuspend_disable() will be called before the display is turned on
          and autosuspend_enable() will be called after the display is turned off.
          This mode provides best compatibility for devices using legacy power management
@@ -58,6 +57,7 @@
          Refer to autosuspend.h for details.
     -->
     <bool name="config_powerDecoupleAutoSuspendModeFromDisplay">true</bool>
+
     <!-- Flag indicating whether we should enable the automatic brightness.
          Software implementation will be used if config_hardware_auto_brightness_available is not set -->
     <bool name="config_automatic_brightness_available">true</bool>
