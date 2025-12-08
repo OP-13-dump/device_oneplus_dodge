@@ -1,0 +1,2 @@
+# Allow power hal to access /sys/proc/walt sysnodes
+allow hal_power_default proc:file { write open getattr };
