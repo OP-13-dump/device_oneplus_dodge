@@ -40,3 +40,4 @@ include vendor/oneplus/dodge/BoardConfigVendor.mk
 BOARD_VENDOR_SEPOLICY_DIRS += $(DEVICE_PATH)/sepolicy/vendor
 BOARD_PRIVATE_SEPOLICY_DIR += $(DEVICE_PATH)/sepolicy/private
 
+BUILD_BROKEN_VENDOR_PROPERTY_NAMESPACE := true
