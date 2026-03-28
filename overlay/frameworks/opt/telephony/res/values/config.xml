@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+     Copyright (C) 2026 The LineageOS Project
+     SPDX-License-Identifier: Apache-2.0
+-->
+<resources>
+    <!-- This device supports 5G SA and NSA (SM8750 modem X85) -->
+    <bool name="config_nr_preferred_network_mode_ims_registered">true</bool>
+
+    <!-- Dual SIM (Dual Standby) PLQ110 is CN dual SIM -->
+    <integer name="config_num_phone_accounts">2</integer>
+
+    <!-- VoLTE available on both SIMs -->
+    <bool name="config_mobile_data_capable">true</bool>
+
+</resources>
