@@ -1,0 +1,2 @@
+# Allow PermissionController to find QSPM HAL service
+allow permissioncontroller_app vendor_hal_qspmhal_hwservice:hwservice_manager find;

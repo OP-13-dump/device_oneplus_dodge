@@ -1,0 +1,32 @@
+# ============================================================
+# FIX: isolated_app AVC denials for setattr on app_data_file
+#
+# Denials from logcat (all same pattern, multiple files):
+#   avc: denied { setattr } for
+#     name="privacy-sandbox-attestations.dat"
+#     name="manifest.json"
+#     name="verified_contents.json"
+#     name="LICENSE.txt"
+#     name="cr_en-us_500000_index.bin"
+#     (hex: 46696C746572696E672052756C6573 = "Filtering Rules")
+#     scontext=u:r:isolated_app:s0:c512,c768
+#     tcontext=u:object_r:app_data_file:s0:c94,c257,c512,c768
+#     tclass=file permissive=0
+#
+# Triggered by: Chrome/WebView isolated renderer processes
+# attempting to update component files in their data directory.
+# These are legitimate operations — the renderer needs to touch
+# metadata on its own sandboxed files.
+#
+# File location in ROM tree:
+#   system/sepolicy/private/isolated_app.te
+#   (append these lines)
+#
+# NOTE: isolated_app already has read/write on app_data_file
+# in AOSP. The missing piece is setattr (changing file metadata
+# like timestamps/permissions). This is safe to allow because
+# isolated_app is already MLS-constrained to its own category
+# set (c512,c768 must match the file's categories).
+# ============================================================
+
+allow isolated_app app_data_file:file setattr;

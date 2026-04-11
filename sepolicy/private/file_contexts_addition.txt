@@ -1,0 +1,25 @@
+# ============================================================
+# FIX: SELinux context for xt_idletimer sysfs node
+#
+# Error from logcat:
+#   SELinux: Could not set context for
+#     /sys/devices/virtual/xt_idletimer/timers/105:
+#     No such file or directory
+#   ueventd: selinux_android_restorecon(
+#     /sys/devices/virtual/xt_idletimer/timers) failed: Success
+#
+# The "Success" on a failed restorecon is a misleading errno —
+# the real issue is the path doesn't exist at restorecon time
+# (race condition: ueventd runs before the netfilter module
+# creates the timer entry). The label is missing entirely.
+#
+# File location in ROM tree:
+#   system/sepolicy/private/file_contexts  (system partition)
+#   OR
+#   vendor/etc/selinux/vendor_file_contexts  (vendor partition)
+#
+# Add this line to the appropriate file_contexts:
+# ============================================================
+
+# xt_idletimer netfilter timer sysfs nodes (used for network idle detection)
+/sys/devices/virtual/xt_idletimer(/.*)?    u:object_r:sysfs_net:s0

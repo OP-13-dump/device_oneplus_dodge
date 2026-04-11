@@ -31,6 +31,12 @@ TARGET_RECOVERY_UI_MARGIN_HEIGHT := 103
 
 # SEPolicy
 BOARD_VENDOR_SEPOLICY_DIRS += $(DEVICE_PATH)/sepolicy/vendor
+BOARD_SYSTEM_EXT_PRIVATE_SEPOLICY_DIRS += $(DEVICE_PATH)/sepolicy/private
 
 # Include the proprietary files BoardConfig.
 include vendor/oneplus/dodge/BoardConfigVendor.mk
+
+# SEPolicy
+BOARD_VENDOR_SEPOLICY_DIRS += $(DEVICE_PATH)/sepolicy/vendor
+BOARD_PRIVATE_SEPOLICY_DIR += $(DEVICE_PATH)/sepolicy/private
+
