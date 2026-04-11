@@ -1,0 +1,22 @@
+# ============================================================
+# FIX: system_server AVC denials for vendor /proc nodes
+#
+# Denials from logcat:
+#   avc: denied { search } for name="charger" dev="proc"
+#     scontext=u:r:system_server:s0
+#     tcontext=u:object_r:vendor_proc_charger:s0 tclass=dir
+#
+#   avc: denied { search } for name="oplus_secure_common" dev="proc"
+#     scontext=u:r:system_server:s0
+#     tcontext=u:object_r:vendor_proc_oppo_secure_common_file:s0 tclass=dir
+#
+# Triggered by: CachedAppOptimizer reading charger state for
+# process management decisions.
+#
+# File location in ROM tree:
+#   system/sepolicy/private/system_server.te
+#   (append these lines, do not replace the file)
+# ============================================================
+
+allow system_server vendor_proc_charger:dir search;
+allow system_server vendor_proc_oppo_secure_common_file:dir search;
