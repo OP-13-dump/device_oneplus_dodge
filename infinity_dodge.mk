@@ -11,10 +11,26 @@ $(call inherit-product, $(SRC_TARGET_DIR)/product/full_base_telephony.mk)
 # Inherit from dodge device
 $(call inherit-product, device/oneplus/dodge/device.mk)
 
-# Inherit some common Lineage stuff.
-$(call inherit-product, vendor/lineage/config/common_full_phone.mk)
+# Inherit some common Project Infinity-X stuff.
+$(call inherit-product, vendor/infinity/config/common_full_phone.mk)
 
-PRODUCT_NAME := lineage_dodge
+# Project InfinityX Flags
+INFINITY_BUILD_TYPE := OFFICIAL
+INFINITY_MAINTAINER := Arijit-Saha
+TARGET_SUPPORTS_BLUR := true
+TARGET_HAS_UDFPS := true
+TARGET_BUILD_GOOGLE_TELEPHONY := false
+USE_MOTO_CALCULATOR := true
+
+# Gapps
+WITH_GAPPS := true
+WITH_GMS := true
+TARGET_SHIPS_FULL_GAPPS := false
+
+# Bootanimation
+TARGET_BOOT_ANIMATION_RES := 1080
+
+PRODUCT_NAME := infinity_dodge
 PRODUCT_DEVICE := dodge
 PRODUCT_MANUFACTURER := OnePlus
 PRODUCT_BRAND := OnePlus
