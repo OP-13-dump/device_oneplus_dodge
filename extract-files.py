@@ -29,7 +29,23 @@ blob_fixups: blob_fixups_user_type = {
     'odm/firmware/fastchg/23821/charging_hyper_mode_config.txt': blob_fixup()
         .regex_replace(r"(PROJECT:=)23893", r"\g<1>23821"),
     'odm/lib64/libAlgoProcess.so': blob_fixup()
-        .replace_needed('android.hardware.graphics.common-V5-ndk.so', 'android.hardware.graphics.common-V7-ndk.so'),
+        .replace_needed('android.hardware.graphics.common-V5-ndk.so', 'android.hardware.graphics.common-V7-ndk.so')
+        # APS capture crash:
+        # android::hwIPEDoProcess does an IN-PLACE 10-bit conversion and calls
+        # APSFormatConverterNeon::p010LSB2MSBNeon(dst, src=dst, w, h, dstStride, srcStride). It
+        # loads dstStride correctly from [x28,#0x2f4c] (=8192) but loads srcStride from the
+        # adjacent field [x28,#0x2f50], which is UNINITIALIZED on this port (=0xfc850fbf garbage).
+        # The huge srcStride makes the NEON read loop walk ~23GB past the source buffer -> SIGSEGV
+        # SEGV_MAPERR (when fatal) or APS aborts the result and the soft deferred-QuickJpeg is kept
+        # (every photo). Since src==dst the two strides MUST be equal, so redirect the srcStride
+        # load (w5) to the dstStride field [x28,#0x2f4c], matching the adjacent w4 load:
+        #   ldr w5,[x28,#0x2f50] (b96f5385) -> ldr w5,[x28,#0x2f4c] (b96f4f85)  (one byte: 53->4f)
+        # Verified via native Frida probe (p010LSB2MSBNeon args) + tombstone. 12-byte anchor =
+        # ldr w3,[x28,#0x2f30]; ldr w4,[x28,#0x2f4c]; ldr w5,[x28,#0x2f50].
+        .binary_regex_replace(
+            b'\x83\x33\x6f\xb9\x84\x4f\x6f\xb9\x85\x53\x6f\xb9',
+            b'\x83\x33\x6f\xb9\x84\x4f\x6f\xb9\x85\x4f\x6f\xb9',
+        ),
     (
         'odm/lib64/libAncHumanSegFigureFusion.so',
         'odm/lib64/libEIS.so',
@@ -45,6 +61,17 @@ blob_fixups: blob_fixups_user_type = {
         .clear_symbol_version('AHardwareBuffer_lockPlanes')
         .clear_symbol_version('AHardwareBuffer_release')
         .clear_symbol_version('AHardwareBuffer_unlock'),
+    # Master/Pro-mode photos come out with RED/BLUE swapped. Pro mode captures RAW10 and the
+    # OnePlus OCCE tone-mapper (libBasicTonePhoto.so) runs an OpenGL shader whose body contains a
+    # U/V (Cb/Cr) reorder `dstYuv = vec4(dstYuv.r, dstYuv.b, dstYuv.g, 1.0)`. On this port the net
+    # result is a single uncompensated chroma swap -> R/B swapped JPEG. Undo the swap in the
+    # embedded GLSL (length-preserving). Normal/Photo mode does NOT use BasicTone, so this only
+    # affects the (otherwise crisp) Master/Pro path..
+    'odm/lib64/libBasicTonePhoto.so': blob_fixup()
+        .binary_regex_replace(
+            b'vec4\\(dstYuv\\.r, dstYuv\\.b, dstYuv\\.g, 1\\.0\\)',
+            b'vec4(dstYuv.r, dstYuv.g, dstYuv.b, 1.0)',
+        ),
     'odm/lib64/libsensorbridge.so': blob_fixup()
         .replace_needed('android.hardware.sensors-V2-ndk.so', 'android.hardware.sensors-V3-ndk.so'),
     (
