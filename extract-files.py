@@ -45,6 +45,7 @@ blob_fixups: blob_fixups_user_type = {
     (
         'odm/lib64/libAncHumanSegFigureFusion.so',
         'odm/lib64/libEIS.so',
+        'odm/lib64/libEISLive.so',
         'odm/lib64/libHIS.so',
         'odm/lib64/libOPAlgoCamAiBeautyFaceRetouchCn.so',
         'odm/lib64/libOPAlgoCamAiUnifySkin.so',
@@ -100,6 +101,9 @@ blob_fixups: blob_fixups_user_type = {
         .replace_needed('libui.so', 'libui-stock.so'),
     'vendor/lib64/libui-stock.so': blob_fixup()
         .replace_needed('android.hardware.graphics.common-V5-ndk.so', 'android.hardware.graphics.common-V7-ndk.so'),
+    'odm/etc/camera/CameraHWConfiguration.config': blob_fixup()
+        .regex_replace('enableSWfdForThirdCamUnit   = FALSE', 'enableSWfdForThirdCamUnit   = TRUE')
+        .regex_replace('fdSupport                 = FALSE;', 'fdSupport                 = TRUE;'),
 }  # fmt: skip
 
 module = ExtractUtilsModule(
