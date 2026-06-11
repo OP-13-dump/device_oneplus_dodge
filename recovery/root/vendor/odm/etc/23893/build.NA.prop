@@ -1,2 +1,9 @@
 ro.product.odm.model=CPH2655
 ro.product.odm.name=CPH2655
+# Stock ships a regionmark for EU/CN/IN but not for NA, so NA units fall back to
+# EUEX. AIUnit's own region resolution is already pinned by
+# persist.sys.oplus.region=US in system_ext.prop, but the Odin cloud endpoints
+# read this separately as the trackRegion request header, and an empty value gets
+# the AI inference call rejected with 3000404. ROW is what the NA retail units
+# report. Previously set at runtime by a KernelSU service script.
+ro.vendor.oplus.regionmark=ROW
