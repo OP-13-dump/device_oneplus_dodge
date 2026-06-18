@@ -30,6 +30,8 @@
 #include <string.h>
 #include <sys/mman.h>
 #include <unistd.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 #define TAG "apsfixup"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, TAG, __VA_ARGS__)
@@ -43,16 +45,44 @@ static inline bool is_buf(uint64_t v)     { uint32_t hi=(uint32_t)(v>>32); retur
 static inline bool is_garbage(uint64_t v) { uint32_t hi=(uint32_t)(v>>32); return hi>=0x70 && hi<=0x7f && (uint32_t)v <  0x100000u; }
 
 static bool range_of(uint64_t addr, uint64_t* out_base, uint64_t* out_size) {
-    FILE* f = fopen("/proc/self/maps", "re");
-    if (!f) return false;
-    char line[512]; bool found = false;
-    while (fgets(line, sizeof(line), f)) {
-        uint64_t lo, hi;
-        if (sscanf(line, "%" SCNx64 "-%" SCNx64, &lo, &hi) != 2) continue;
-        if (addr >= lo && addr < hi) { *out_base = lo; *out_size = hi - lo; found = true; break; }
+    // Low-Level Read via Linux Syscalls (Zero Locks, Zero Allocations)
+    // Extreme speed to handle dozens of simultaneous threads without timeouts.
+    int fd = open("/proc/self/maps", O_RDONLY | O_CLOEXEC);
+    if (fd < 0) return false;
+
+    char buf[8192]; // Read in large 8KB blocks at a time
+    ssize_t bytes;
+    uint64_t lo = 0, hi = 0;
+    int state = 0; // 0=reading start, 1=reading end, 2=skipping to next line
+
+    while ((bytes = read(fd, buf, sizeof(buf))) > 0) {
+        for (ssize_t i = 0; i < bytes; i++) {
+            char c = buf[i];
+            if (state == 0) {
+                if (c == '-') state = 1;
+                else lo = (lo << 4) | (c <= '9' ? c - '0' : (c & 0xDF) - 'A' + 10);
+            } else if (state == 1) {
+                if (c == ' ') {
+                    if (addr >= lo && addr < hi) {
+                        *out_base = lo;
+                        *out_size = hi - lo;
+                        close(fd);
+                        return true; // Found, close and exit instantly
+                    }
+                    state = 2; // Not this one, discard the rest of the line
+                } else {
+                    hi = (hi << 4) | (c <= '9' ? c - '0' : (c & 0xDF) - 'A' + 10);
+                }
+            } else if (state == 2) {
+                if (c == '\n') {
+                    state = 0; // End of line, reset for the next one
+                    lo = 0; hi = 0;
+                }
+            }
+        }
     }
-    fclose(f);
-    return found;
+    close(fd);
+    return false;
 }
 static bool module_base(const char* name, uint64_t* out_base) {
     FILE* f = fopen("/proc/self/maps", "re");
@@ -118,6 +148,7 @@ __asm__(
 "    stp x2, x3, [sp, #0x20]\n"
 "    stp x4, x5, [sp, #0x30]\n"
 "    stp x6, x7, [sp, #0x40]\n"
+"    str x8, [sp, #0x50]\n"           // save x8 (indirect result location register)
 "    ldr x0, [sp, #0x18]\n"           // aps_repair_structs(orig x1, orig x2, orig x3)
 "    ldr x1, [sp, #0x20]\n"
 "    ldr x2, [sp, #0x28]\n"
@@ -126,6 +157,7 @@ __asm__(
 "    ldp x2, x3, [sp, #0x20]\n"
 "    ldp x4, x5, [sp, #0x30]\n"
 "    ldp x6, x7, [sp, #0x40]\n"
+"    ldr x8, [sp, #0x50]\n"           // restore x8
 "    ldp x29, x30, [sp], #0x60\n"     // pop frame -> sp back to entry (stack args in place), x30 restored
 "    adrp x16, aps_real_arc\n"
 "    add  x16, x16, #:lo12:aps_real_arc\n"
@@ -198,7 +230,7 @@ static void* poller(void*) {
 __attribute__((constructor))
 static void apsfixup_init() {
     LOGI("libapsfixup loaded (pid %d)", getpid());
-    try_install();                       // libAlgoProcess is loaded with us; libAlgoInterface may be too
+    try_install();
     if (!(g_p010_done && g_dlsym_done)) {
         pthread_t t; pthread_create(&t, nullptr, poller, nullptr); pthread_detach(t);
     }
