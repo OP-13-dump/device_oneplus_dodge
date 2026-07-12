@@ -12,16 +12,15 @@ package org.lineageos.device.settings.refreshrate;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
-import android.content.SharedPreferences;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.UserHandle;
 import android.provider.Settings;
 import android.util.Log;
 
-import androidx.preference.PreferenceManager;
-
 import org.lineageos.device.settings.Constants;
+import org.lineageos.device.settings.display.HbmController;
+import org.lineageos.device.settings.utils.FileUtils;
 import org.lineageos.device.settings.utils.ForegroundAppDetector;
 
 public class RefreshRateMonitorService extends Service {
@@ -35,14 +34,13 @@ public class RefreshRateMonitorService extends Service {
     private ForegroundAppDetector mForegroundDetector;
     private boolean mAppMonitoringActive = false;
 
-    private static final String KEY_BACKUP_MIN_REFRESH_RATE = "rr_backup_min_refresh_rate";
-    private static final String KEY_BACKUP_MAX_REFRESH_RATE = "rr_backup_max_refresh_rate";
-
-    private static final float REFRESH_RATE_AUTO_MIN = 60f;
-    private static final float REFRESH_RATE_AUTO_MAX = 120f;
-
-    private float mBackedUpMinRate = -1f;
-    private float mBackedUpMaxRate = -1f;
+    // "auto" = full dynamic range: let SurfaceFlinger range across 60/90/120 by
+    // content while the kernel ADFR self-refresh drops the DDIC to 20/1 beneath.
+    // Panel max is 120 on dodge (1440p and 1080p timings). Defining auto explicitly (instead of restoring the
+    // user's Android "Smooth display" baseline, which is often 60) is what keeps
+    // auto from welding the ceiling to 60Hz.
+    private static final float AUTO_MIN_REFRESH_RATE = 60f;
+    private static final float AUTO_PEAK_REFRESH_RATE = 120f;
 
     // ===== Lifecycle =====
 
@@ -60,7 +58,9 @@ public class RefreshRateMonitorService extends Service {
     public void onDestroy() {
         super.onDestroy();
         stopAppMonitoring();
-        restoreRefreshRates();
+        // Leave the last applied refresh-rate state in place: START_STICKY restarts
+        // re-apply it from the controller, and nothing here is ever "stuck low"
+        // (fixed pins the mode rate; auto is already the full dynamic range).
         sInstance = null;
         if (Constants.DEBUG) Log.i(TAG, "Service destroyed");
     }
@@ -118,6 +118,16 @@ public class RefreshRateMonitorService extends Service {
         if (!mAppMonitoringActive) {
             if (Constants.DEBUG) Log.i(TAG, "Starting app monitoring");
             startAppMonitoring();
+            // startAppMonitoring delivers an initial report for the current app
+        } else {
+            // Monitoring was already active, so no app-change report is coming:
+            // apply the (possibly changed) effective rate for the current app now,
+            // otherwise a tile/settings change only takes effect on the next app switch
+            String pkg = mForegroundDetector.getCurrentForegroundApp();
+            int targetFps = mRefreshRateController.getEffectiveRefreshRate(pkg);
+            if (Constants.DEBUG) Log.i(TAG, "Applying effective rate " + targetFps
+                    + " for current app " + pkg);
+            applyRefreshRate(targetFps);
         }
     }
 
@@ -159,138 +169,37 @@ public class RefreshRateMonitorService extends Service {
     // ===== Refresh rate application via Settings =====
 
     private void applyRefreshRate(int fps) {
-        if (mRefreshRateController.shouldSkipRefreshRateChanges()) return;
-
-        // Backup current rates if not already backed up
-        if (mBackedUpMinRate < 0 || mBackedUpMaxRate < 0) {
-            backupCurrentRates();
+        // HBM pins the refresh rate to 120Hz to avoid timing-switch flashes; don't
+        // fight that pin - overrides re-apply on the next app change after HBM ends
+        if (HbmController.getInstance(this).isHbmEnabled()) {
+            if (Constants.DEBUG) Log.i(TAG, "HBM active, skipping refresh rate change");
+            return;
         }
 
-        if (fps == 0) {
-            // Auto/dynamic mode: set MIN to 60, MAX to 120
-            if (Constants.DEBUG) Log.i(TAG, "Setting dynamic refresh rate - MIN: 60Hz, MAX: 120Hz");
+        // Fixed rates mean fixed all the way down: pin the panel self-refresh at
+        // the mode rate too; auto (0) re-enables dynamic LTPO (20Hz floor, 1Hz idle)
+        FileUtils.writeLine(Constants.NODE_ADFR_MIN_FPS, String.valueOf(fps));
 
-            Settings.System.putFloatForUser(
-                    getContentResolver(),
-                    Settings.System.MIN_REFRESH_RATE,
-                    REFRESH_RATE_AUTO_MIN,
-                    UserHandle.USER_CURRENT
-            );
+        // fps == 0 (auto): open SF to the full 60..120 range so it can pick the mode
+        // by content. fps > 0 (fixed): lock SF to that single mode (MIN == PEAK).
+        final float minRate = (fps == 0) ? AUTO_MIN_REFRESH_RATE : (float) fps;
+        final float peakRate = (fps == 0) ? AUTO_PEAK_REFRESH_RATE : (float) fps;
 
-            Settings.System.putFloatForUser(
-                    getContentResolver(),
-                    Settings.System.PEAK_REFRESH_RATE,
-                    REFRESH_RATE_AUTO_MAX,
-                    UserHandle.USER_CURRENT
-            );
-        } else {
-            // Fixed fps mode: lock both MIN and MAX to the same value
-            float targetRate = (float) fps;
+        if (Constants.DEBUG) Log.i(TAG, "Applying MIN/PEAK refresh rate: "
+                + minRate + "/" + peakRate + " Hz (fps=" + fps + ")");
 
-            if (Constants.DEBUG) Log.i(TAG, "Setting fixed refresh rate to: " + targetRate + " Hz");
+        Settings.System.putFloatForUser(
+                getContentResolver(),
+                Settings.System.MIN_REFRESH_RATE,
+                minRate,
+                UserHandle.USER_CURRENT
+        );
 
-            Settings.System.putFloatForUser(
-                    getContentResolver(),
-                    Settings.System.MIN_REFRESH_RATE,
-                    targetRate,
-                    UserHandle.USER_CURRENT
-            );
-
-            Settings.System.putFloatForUser(
-                    getContentResolver(),
-                    Settings.System.PEAK_REFRESH_RATE,
-                    targetRate,
-                    UserHandle.USER_CURRENT
-            );
-        }
-
-        if (Constants.DEBUG) Log.i(TAG, "Refresh rate applied successfully");
-    }
-
-    private void backupCurrentRates() {
-        try {
-            mBackedUpMinRate = Settings.System.getFloatForUser(
-                    getContentResolver(),
-                    Settings.System.MIN_REFRESH_RATE,
-                    60f,
-                    UserHandle.USER_CURRENT
-            );
-
-            mBackedUpMaxRate = Settings.System.getFloatForUser(
-                    getContentResolver(),
-                    Settings.System.PEAK_REFRESH_RATE,
-                    120f,
-                    UserHandle.USER_CURRENT
-            );
-
-            // Also store in SharedPreferences for persistence across service restarts
-            SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
-            prefs.edit()
-                    .putFloat(KEY_BACKUP_MIN_REFRESH_RATE, mBackedUpMinRate)
-                    .putFloat(KEY_BACKUP_MAX_REFRESH_RATE, mBackedUpMaxRate)
-                    .apply();
-
-            if (Constants.DEBUG) Log.i(TAG, "Backed up refresh rates - MIN: " + mBackedUpMinRate + ", MAX: " + mBackedUpMaxRate);
-        } catch (Exception e) {
-            Log.e(TAG, "Failed to backup refresh rates", e);
-        }
-    }
-
-    private void restoreRefreshRates() {
-        try {
-            // Try to restore from memory first
-            if (mBackedUpMinRate > 0 && mBackedUpMaxRate > 0) {
-                Settings.System.putFloatForUser(
-                        getContentResolver(),
-                        Settings.System.MIN_REFRESH_RATE,
-                        mBackedUpMinRate,
-                        UserHandle.USER_CURRENT
-                );
-
-                Settings.System.putFloatForUser(
-                        getContentResolver(),
-                        Settings.System.PEAK_REFRESH_RATE,
-                        mBackedUpMaxRate,
-                        UserHandle.USER_CURRENT
-                );
-
-                if (Constants.DEBUG) Log.i(TAG, "Restored refresh rates - MIN: " + mBackedUpMinRate + ", MAX: " + mBackedUpMaxRate);
-            } else {
-                // Try to restore from SharedPreferences
-                SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
-                float minRate = prefs.getFloat(KEY_BACKUP_MIN_REFRESH_RATE, 60f);
-                float maxRate = prefs.getFloat(KEY_BACKUP_MAX_REFRESH_RATE, 120f);
-
-                Settings.System.putFloatForUser(
-                        getContentResolver(),
-                        Settings.System.MIN_REFRESH_RATE,
-                        minRate,
-                        UserHandle.USER_CURRENT
-                );
-
-                Settings.System.putFloatForUser(
-                        getContentResolver(),
-                        Settings.System.PEAK_REFRESH_RATE,
-                        maxRate,
-                        UserHandle.USER_CURRENT
-                );
-
-                if (Constants.DEBUG) Log.i(TAG, "Restored refresh rates from prefs - MIN: " + minRate + ", MAX: " + maxRate);
-            }
-
-            // Clear backups
-            mBackedUpMinRate = -1f;
-            mBackedUpMaxRate = -1f;
-
-            SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
-            prefs.edit()
-                    .remove(KEY_BACKUP_MIN_REFRESH_RATE)
-                    .remove(KEY_BACKUP_MAX_REFRESH_RATE)
-                    .apply();
-
-            if (Constants.DEBUG) Log.i(TAG, "Refresh rates restored - Smooth Display auto-enabled");
-        } catch (Exception e) {
-            Log.e(TAG, "Failed to restore refresh rates", e);
-        }
+        Settings.System.putFloatForUser(
+                getContentResolver(),
+                Settings.System.PEAK_REFRESH_RATE,
+                peakRate,
+                UserHandle.USER_CURRENT
+        );
     }
 }

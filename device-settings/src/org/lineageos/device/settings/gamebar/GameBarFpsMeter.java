@@ -24,6 +24,8 @@ import android.window.TaskFpsCallback;
 
 import androidx.preference.PreferenceManager;
 
+import org.lineageos.device.settings.Constants;
+
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
@@ -35,6 +37,13 @@ public class GameBarFpsMeter {
     private static final float TOLERANCE = 0.1f;
     private static final long STALENESS_THRESHOLD_MS = 2000;
     private static final long TASK_CHECK_INTERVAL_MS = 1000;
+
+    // "legacy" = CRTC measured_fps (SurfaceFlinger composition rate = what a game
+    // actually renders on screen; same node the FPS Info tile shows),
+    // "new" = TaskFpsCallback (per-task render fps).
+    // The real panel self-refresh rate (test_te) belongs to the SF "Show refresh
+    // rate" overlay, not here.
+    private static final String FPS_METHOD_DEFAULT = "legacy";
 
     private static GameBarFpsMeter sInstance;
     private final Context mContext;
@@ -72,8 +81,11 @@ public class GameBarFpsMeter {
     }
 
     public void start() {
-        String method = mPrefs.getString("game_bar_fps_method", "new");
-        if (!"new".equals(method)) return;
+        String method = mPrefs.getString("game_bar_fps_method", FPS_METHOD_DEFAULT);
+        if (!"new".equals(method)) {
+            // Sysfs method reads measured_fps directly - nothing to enable.
+            return;
+        }
 
         stop();
 
@@ -94,7 +106,7 @@ public class GameBarFpsMeter {
     }
 
     public void stop() {
-        String method = mPrefs.getString("game_bar_fps_method", "new");
+        String method = mPrefs.getString("game_bar_fps_method", FPS_METHOD_DEFAULT);
         if ("new".equals(method) && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (mCallbackRegistered) {
                 try {
@@ -108,7 +120,7 @@ public class GameBarFpsMeter {
     }
 
     public float getFps() {
-        String method = mPrefs.getString("game_bar_fps_method", "new");
+        String method = mPrefs.getString("game_bar_fps_method", FPS_METHOD_DEFAULT);
         if ("legacy".equals(method)) {
             return readLegacyFps();
         } else {
@@ -116,16 +128,29 @@ public class GameBarFpsMeter {
         }
     }
 
+    /**
+     * Reads the CRTC measured_fps counter = the SurfaceFlinger composition rate,
+     * i.e. how fast the foreground content is actually drawn (what you want as a
+     * game FPS meter). This is the same node the FPS Info tile reads, so the two
+     * agree. It is NOT the panel self-refresh rate - that lives in the SF "Show
+     * refresh rate" overlay (test_te). Parses either a plain number or a
+     * "label: N" line, matching FPSInfoService. Keeps the last value on a bad read.
+     */
     private float readLegacyFps() {
-        try (BufferedReader br = new BufferedReader(new FileReader("/sys/class/drm/sde-crtc-0/measured_fps"))) {
+        try (BufferedReader br = new BufferedReader(new FileReader(Constants.NODE_MEASURED_FPS))) {
             String line = br.readLine();
-            if (line != null && line.startsWith("fps:")) {
-                String[] parts = line.split("\\s+");
-                if (parts.length >= 2) {
-                    return Float.parseFloat(parts[1].trim());
+            if (line != null) {
+                String token = line.trim();
+                if (token.contains(": ")) {
+                    token = token.split("\\s+")[1];
                 }
+                float fps = Float.parseFloat(token);
+                if (fps > 0) {
+                    mCurrentFps = fps;
+                }
+                return mCurrentFps > 0 ? mCurrentFps : -1f;
             }
-        } catch (IOException | NumberFormatException e) {
+        } catch (IOException | NumberFormatException | ArrayIndexOutOfBoundsException e) {
         }
         return -1f;
     }
