@@ -117,8 +117,10 @@ public class Constants {
 
     /** CRTC frame-done counter = SurfaceFlinger composition rate (NOT the panel
      *  self-refresh rate). This is what the crDroid FPS Info tile shows
-     *  (config_fpsInfoSysNode); GameBar reads the same node for a matching number. */
-    public static final String NODE_MEASURED_FPS = "/sys/class/drm/sde-crtc-0/measured_fps";
+     *  (config_fpsInfoSysNode); GameBar reads the same node for a matching number.
+     *  The sm8750 (sun) kernel names the CRTC sysfs device "card0-sde-crtc-0"
+     *  (device_create "card%d-sde-crtc-%d"), unlike sm8550/sm8650's "sde-crtc-0". */
+    public static final String NODE_MEASURED_FPS = "/sys/class/drm/card0-sde-crtc-0/measured_fps";
 
     /** ADFR/LTPO min fps request: 0 = auto (panel self-refresh drops to the
      *  timing's lowest table entry: 20Hz active floor, 1Hz idle), N = fixed
