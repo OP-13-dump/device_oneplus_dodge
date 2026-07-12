@@ -1,0 +1,4 @@
+# Show refresh rate overlay reads the panel test-TE counter
+# (/sys/kernel/oplus_display/test_te, ro.surface_flinger.panel_refresh_rate_node)
+allow surfaceflinger vendor_sysfs_graphics:dir search;
+allow surfaceflinger vendor_sysfs_graphics:file r_file_perms;

@@ -13,6 +13,13 @@ bluetooth.device.default_name=OnePlus 13
 # Device name
 ro.product.marketname=OnePlus 13
 
+# Graphics
+# Dev options "Show refresh rate" reads the real panel rate from the DDIC
+# test-TE counter (device-settings enables the irq at boot); kernel ADFR
+# self-refresh drops show up here (20Hz floor, 1Hz idle) while the SF mode
+# stays put.
+ro.surface_flinger.panel_refresh_rate_node=/sys/kernel/oplus_display/test_te
+
 # USB
 vendor.usb.product_string=OnePlus 13
 
