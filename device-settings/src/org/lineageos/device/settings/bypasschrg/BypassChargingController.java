@@ -140,47 +140,59 @@ public class BypassChargingController {
     }
 
     public boolean isBypassChargingSupported() {
-        try {
-            FileUtils.readLine(Constants.NODE_BYPASS_CHARGING);
-            return true;
-        } catch (Exception e) {
-            return false;
+        // readLine returns null (instead of throwing) when the node is missing or unreadable
+        return FileUtils.readLine(Constants.NODE_BYPASS_CHARGING) != null;
+    }
+
+    /**
+     * Rewrite the sysfs node so the hardware matches the persisted state.
+     * The kernel vote resets on every reboot (and survives replug), so this must run
+     * whenever the app (re)initializes - otherwise a reboot while plugged in with
+     * bypass ON silently charges past the target, and a stale "charging disabled"
+     * vote left by a crash would prevent charging entirely.
+     */
+    public void reconcileHardwareState() {
+        synchronized (mLock) {
+            int level = getLevelFromIntent();
+            if (isValidLevel(level)) {
+                mBatteryLevel = level;
+                saveCurrentBatteryLevel(level);
+            }
+
+            int status = getBypassChargingStatus();
+            int target = getBypassChargingTarget();
+            int current = getCurrentBatteryLevel();
+            boolean wantBypass;
+
+            if (status == Constants.BYPASS_OFF) {
+                wantBypass = (mActiveApp != null) && (current >= target);
+            } else {
+                wantBypass = current >= target;
+                if (wantBypass && status == Constants.BYPASS_WAITING) {
+                    saveBypassChargingStatus(Constants.BYPASS_ON);
+                } else if (!wantBypass && status == Constants.BYPASS_ON) {
+                    saveBypassChargingStatus(Constants.BYPASS_WAITING);
+                }
+            }
+
+            if (wantBypass) {
+                enableHardwareBypass();
+            } else {
+                disableHardwareBypass();
+            }
+
+            if (Constants.DEBUG) Log.i(TAG, "Reconciled hardware state: " + getState());
+            notifyStateChanged();
         }
     }
 
     // ===== Power events =====
 
     public void handlePowerConnected() {
-        synchronized (mLock) {
-            if (Constants.DEBUG) Log.i(TAG, "Power connected");
-
-            mBatteryLevel = getLevelFromIntent();
-            if (isValidLevel(mBatteryLevel)) {
-                saveCurrentBatteryLevel(mBatteryLevel);
-            }
-
-            int status = getBypassChargingStatus();
-            int target = getBypassChargingTarget();
-            int current = getCurrentBatteryLevel();
-
-            if (status == Constants.BYPASS_ON) {
-                if (current >= target) {
-                    enableHardwareBypass();
-                    if (Constants.DEBUG) Log.i(TAG, "Re-enabled global (level >= target)");
-                } else {
-                    disableHardwareBypass();
-                    saveBypassChargingStatus(Constants.BYPASS_WAITING);
-                    if (Constants.DEBUG) Log.i(TAG, "Below target, now WAITING");
-                }
-            } else if (status == Constants.BYPASS_WAITING && current >= target) {
-                if (enableHardwareBypass()) {
-                    saveBypassChargingStatus(Constants.BYPASS_ON);
-                    if (Constants.DEBUG) Log.i(TAG, "Reached target, now ON");
-                }
-            }
-
-            notifyStateChanged();
-        }
+        if (Constants.DEBUG) Log.i(TAG, "Power connected");
+        // Covers all states, including recovering a stale "charging disabled"
+        // vote when bypass is OFF
+        reconcileHardwareState();
     }
 
     public void handlePowerDisconnected() {
@@ -299,6 +311,16 @@ public class BypassChargingController {
                 }
             }
 
+            // Global bypass active but the battery drained below target
+            // (system load exceeded the adapter budget): top up to target again
+            if (status == Constants.BYPASS_ON && level < target) {
+                disableHardwareBypass();
+                saveBypassChargingStatus(Constants.BYPASS_WAITING);
+                if (Constants.DEBUG) Log.i(TAG, "Global: dropped below target at " + level + "%, recharging");
+                notifyStateChanged();
+                return;
+            }
+
             // Check if app waiting reached target
             if (mActiveApp != null && status == Constants.BYPASS_OFF && level >= target) {
                 if (enableHardwareBypass()) {
@@ -306,6 +328,14 @@ public class BypassChargingController {
                     notifyStateChanged();
                     return;
                 }
+            }
+
+            // App bypass active but the battery drained below target: top up again
+            if (mActiveApp != null && status == Constants.BYPASS_OFF && level < target) {
+                disableHardwareBypass();
+                if (Constants.DEBUG) Log.i(TAG, "App: dropped below target at " + level + "%, recharging");
+                notifyStateChanged();
+                return;
             }
 
             notifyStateChanged();

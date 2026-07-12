@@ -106,6 +106,22 @@ public class ForegroundAppDetector {
             registerTaskStackListenerIfNeeded();
             registerScreenReceiverIfNeeded();
             mHandler.post(this::handlePossibleTopAppChange);
+        } else {
+            // Monitoring already active: the shared dedup (mLastReportedApp) would
+            // suppress the next report, so deliver the current foreground app to the
+            // late listener directly - e.g. bypass monitoring may start while the
+            // user is already inside a listed app
+            mHandler.post(() -> {
+                String topApp = getTopPackageName();
+                if (!TextUtils.isEmpty(topApp)) {
+                    try {
+                        if (Constants.DEBUG) Log.i(TAG, "Initial report to " + listenerId + ": " + topApp);
+                        listener.onForegroundAppChanged(topApp);
+                    } catch (Exception e) {
+                        Log.e(TAG, "Listener exception (" + listenerId + ")", e);
+                    }
+                }
+            });
         }
     }
 
