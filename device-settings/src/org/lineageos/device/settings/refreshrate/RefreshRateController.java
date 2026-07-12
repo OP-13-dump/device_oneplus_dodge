@@ -9,14 +9,12 @@
 package org.lineageos.device.settings.refreshrate;
 
 import android.content.Context;
-import android.os.SystemProperties;
 import android.text.TextUtils;
 import android.util.Log;
 
 import androidx.preference.PreferenceManager;
 
 import org.lineageos.device.settings.Constants;
-import org.lineageos.device.settings.display.HbmController;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -67,8 +65,6 @@ public class RefreshRateController {
     // ===== UI trigger: set global refresh rate =====
 
     public void setGlobalRefreshRate(int fps) {
-        if (shouldSkipRefreshRateChanges()) return;
-
         synchronized (mLock) {
             if (!isValidRefreshRate(fps)) {
                 Log.w(TAG, "Invalid refresh rate: " + fps);
@@ -251,14 +247,6 @@ public class RefreshRateController {
 
     private boolean isValidRefreshRate(int fps) {
         return fps == REFRESH_RATE_AUTO || fps == 60 || fps == 90 || fps == 120;
-    }
-
-    // aston doesn't handle refresh rate changes well on HBM mode, so skip them
-    public boolean shouldSkipRefreshRateChanges() {
-        boolean skip = "aston".equals(SystemProperties.get(Constants.PROP_DEVICE_CODENAME, ""))
-                && HbmController.getInstance(mContext).isHbmEnabled();
-        if (Constants.DEBUG) Log.i(TAG, "shouldSkipRefreshRateChanges: " + skip);
-        return skip;
     }
 
     // ===== Notification =====
