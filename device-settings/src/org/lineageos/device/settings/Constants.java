@@ -108,6 +108,10 @@ public class Constants {
     public static final String NODE_HBM = "/sys/kernel/oplus_display/hbm_max";
     public static final String KEY_HBM = "hbm_max";
 
+    /** Automatic sunlight boost: drives hbm_max from the light sensor with the
+     *  stock hbm_lux_table thresholds (enter 40000 lux, exit 20000 lux). */
+    public static final String KEY_SUNLIGHT_BOOST = "sunlight_boost";
+
     /** Panel test-TE counter: real DDIC self-refresh rate (LTPO). Write "1" to
      *  enable the irq (done at boot by DeviceSettingsService); reads return the
      *  measured rate, or 0 until two TE pulses have been observed. Consumed by the

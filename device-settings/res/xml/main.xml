@@ -68,6 +68,13 @@
             android:title="@string/hbm_title"
             android:summary="@string/hbm_summary" />
 
+        <SwitchPreferenceCompat
+            android:icon="@drawable/ic_hbm"
+            android:key="sunlight_boost"
+            android:defaultValue="true"
+            android:title="@string/sunlight_boost_title"
+            android:summary="@string/sunlight_boost_summary" />
+
     </PreferenceCategory>
 
     <PreferenceCategory
