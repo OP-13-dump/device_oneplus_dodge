@@ -44,6 +44,7 @@ import org.lineageos.device.settings.Constants;
 import org.lineageos.device.settings.display.DisplayModeController;
 import org.lineageos.device.settings.display.HbmController;
 import org.lineageos.device.settings.display.PwmController;
+import org.lineageos.device.settings.display.SunlightBoostController;
 import org.lineageos.device.settings.utils.FileUtils;
 
 public class DeviceSettings extends SettingsBasePreferenceFragment
@@ -58,6 +59,7 @@ public class DeviceSettings extends SettingsBasePreferenceFragment
 
     private SwitchPreferenceCompat mOnePulsePWMSwitch;
     private SwitchPreferenceCompat mHbmSwitch;
+    private SwitchPreferenceCompat mSunlightBoostSwitch;
 
     private HbmController mHbmController;
     private PwmController mPwmController;
@@ -87,6 +89,13 @@ public class DeviceSettings extends SettingsBasePreferenceFragment
             mHbmSwitch.setOnPreferenceChangeListener(this);
         } else {
             mHbmSwitch.setEnabled(false);
+        }
+
+        mSunlightBoostSwitch = (SwitchPreferenceCompat) findPreference(Constants.KEY_SUNLIGHT_BOOST);
+        if (FileUtils.isFileWritable(Constants.NODE_HBM)) {
+            mSunlightBoostSwitch.setOnPreferenceChangeListener(this);
+        } else {
+            mSunlightBoostSwitch.setEnabled(false);
         }
 
         // Sync UI state based on current HBM/PWM state
@@ -178,6 +187,12 @@ public class DeviceSettings extends SettingsBasePreferenceFragment
                 // Re-enable HBM toggle
                 mHbmSwitch.setEnabled(FileUtils.isFileWritable(Constants.NODE_HBM));
             }
+            return true;
+        } else if (preference == mSunlightBoostSwitch) {
+            boolean enabled = (Boolean) newValue;
+            // Persist before the controller re-reads the preference
+            sharedPrefs.edit().putBoolean(Constants.KEY_SUNLIGHT_BOOST, enabled).commit();
+            SunlightBoostController.getInstance(getContext()).updateState();
             return true;
         } else if (preference == mHbmSwitch) {
             boolean enabled = (Boolean) newValue;

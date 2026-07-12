@@ -28,6 +28,7 @@ import org.lineageos.device.settings.bypasschrg.BypassChargingManager;
 import org.lineageos.device.settings.display.DisplayModeController;
 import org.lineageos.device.settings.display.HbmController;
 import org.lineageos.device.settings.display.PwmController;
+import org.lineageos.device.settings.display.SunlightBoostController;
 import org.lineageos.device.settings.gamebar.GameBar;
 import org.lineageos.device.settings.gamebar.GameBarMonitorService;
 import org.lineageos.device.settings.refreshrate.RefreshRateController;
@@ -76,8 +77,19 @@ public class DeviceSettingsService extends Service {
         initializeBypassCharging();
         initializePwm();
         initializeTestTe();
+        initializeSunlightBoost();
         initializeGameBar();
         initializeRefreshRate();
+    }
+
+    private void initializeSunlightBoost() {
+        if (Constants.DEBUG) Log.i(TAG, "Initializing SunlightBoost");
+        try {
+            SunlightBoostController.getInstance(this).init();
+            if (Constants.DEBUG) Log.i(TAG, "SunlightBoost initialized");
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to initialize SunlightBoost", e);
+        }
     }
 
     private void initializeBypassCharging() {
