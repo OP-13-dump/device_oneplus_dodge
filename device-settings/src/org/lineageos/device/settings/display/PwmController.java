@@ -32,8 +32,29 @@ public class PwmController {
     }
 
     public boolean isPwmEnabled() {
-        return mSharedPrefs.getBoolean(Constants.KEY_ONEPULSE_PWM,
-                FileUtils.getFileValueAsBoolean(Constants.NODE_ONEPULSE_PWM, false));
+        // The kernel state resets on reboot, so the node is the source of truth;
+        // the preference is only a fallback while the node is unreadable
+        String value = FileUtils.readLineTrimmed(Constants.NODE_ONEPULSE_PWM);
+        if (value != null) {
+            return "1".equals(value);
+        }
+        return mSharedPrefs.getBoolean(Constants.KEY_ONEPULSE_PWM, false);
+    }
+
+    /**
+     * Re-apply the persisted PWM choice after boot: the panel always comes up with
+     * one-pulse disabled, so a user selection would otherwise be lost on reboot.
+     */
+    public void restorePwmSetting() {
+        boolean wanted = mSharedPrefs.getBoolean(Constants.KEY_ONEPULSE_PWM, false);
+        if (wanted && !isPwmEnabled()) {
+            if (FileUtils.isFileWritable(Constants.NODE_ONEPULSE_PWM)) {
+                setPwm(true);
+                Log.i(TAG, "Restored PWM setting after boot");
+            } else {
+                Log.w(TAG, "PWM node is not writable, cannot restore setting");
+            }
+        }
     }
 
     public boolean enablePwm() {

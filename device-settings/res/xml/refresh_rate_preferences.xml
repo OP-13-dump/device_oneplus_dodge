@@ -14,7 +14,7 @@
             android:summary="@string/refresh_rate_global_summary"
             android:entries="@array/refresh_rate_entries"
             android:entryValues="@array/refresh_rate_values"
-            android:defaultValue="60" />
+            android:defaultValue="0" />
 
     </PreferenceCategory>
 

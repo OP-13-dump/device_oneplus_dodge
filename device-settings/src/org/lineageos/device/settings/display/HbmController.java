@@ -6,8 +6,6 @@ package org.lineageos.device.settings.display;
 
 import android.content.Context;
 import android.content.SharedPreferences;
-import android.os.Handler;
-import android.os.Looper;
 import android.os.UserHandle;
 import android.provider.Settings;
 import android.util.Log;
@@ -25,7 +23,11 @@ public class HbmController {
 
     private static final float MIN = 60.0f;
     private static final float MAX = 120.0f;
-    private static final float HBM_FRAMERATE = 90.0f;
+    // While HBM is on the refresh rate is pinned to 120Hz: the kernel freezes ADFR
+    // min-fps during HBM (register conflict), but SF timing switches (60<->120) still
+    // reprogram the panel and re-latching HBM afterwards shows as a visible flash.
+    // Pinning removes the switches entirely; 120 because HBM runs at max min-fps anyway.
+    private static final float HBM_FRAMERATE = MAX;
     private static final String KEY_BACKUP_MIN_REFRESH_RATE = "hbm_backup_min_refresh_rate";
     private static final String KEY_BACKUP_MAX_REFRESH_RATE = "hbm_backup_max_refresh_rate";
     private static final String KEY_BACKUP_AUTO_BRIGHTNESS = "hbm_backup_auto_brightness";
@@ -43,8 +45,13 @@ public class HbmController {
     }
 
     public boolean isHbmEnabled() {
-        return mSharedPrefs.getBoolean(Constants.KEY_HBM,
-                FileUtils.getFileValueAsBoolean(Constants.NODE_HBM, false));
+        // The panel always boots with HBM off while the preference may still say
+        // enabled (e.g. reboot with HBM on), so the node is the source of truth
+        String value = FileUtils.readLineTrimmed(Constants.NODE_HBM);
+        if (value != null) {
+            return "1".equals(value);
+        }
+        return mSharedPrefs.getBoolean(Constants.KEY_HBM, false);
     }
 
     public boolean enableHbm() {
@@ -94,7 +101,8 @@ public class HbmController {
             Log.i(TAG, "Auto-brightness disabled for HBM");
         }
 
-        // 2. Backup refresh rates
+        // 2.Backup refresh rates and pin to 120Hz so SF stops timing-switching
+        // (each switch re-latches HBM in the kernel, which flashes visibly)
         float currentMinRefreshRate = Settings.System.getFloatForUser(
                 mContext.getContentResolver(),
                 Settings.System.MIN_REFRESH_RATE,
@@ -107,14 +115,11 @@ public class HbmController {
                 MAX,
                 UserHandle.USER_CURRENT);
 
-        Log.i(TAG, "Backing up refresh rates - MIN: " + currentMinRefreshRate + ", MAX: " + currentMaxRefreshRate);
-
         mSharedPrefs.edit()
                 .putFloat(KEY_BACKUP_MIN_REFRESH_RATE, currentMinRefreshRate)
                 .putFloat(KEY_BACKUP_MAX_REFRESH_RATE, currentMaxRefreshRate)
                 .apply();
 
-        // 3.Set constant framerate to 90Hz (workaround for kernel bug with dynamic framerate)
         Settings.System.putFloatForUser(mContext.getContentResolver(),
                 Settings.System.MIN_REFRESH_RATE, HBM_FRAMERATE,
                 UserHandle.USER_CURRENT);
@@ -122,15 +127,14 @@ public class HbmController {
                 Settings.System.PEAK_REFRESH_RATE, HBM_FRAMERATE,
                 UserHandle.USER_CURRENT);
 
-        Log.i(TAG, "HBM enabled - set MIN and MAX to: " + HBM_FRAMERATE);
+        Log.i(TAG, "HBM: pinned refresh rate to " + HBM_FRAMERATE
+                + " (backup MIN: " + currentMinRefreshRate + ", MAX: " + currentMaxRefreshRate + ")");
 
-        // 4.Write HBM sysfs node with delay
-        final Handler handler = new Handler(Looper.getMainLooper());
-        handler.postDelayed(() -> {
-            FileUtils.writeLine(Constants.NODE_HBM, "1");
-            mSharedPrefs.edit().putBoolean(Constants.KEY_HBM, true).commit();
-            Log.i(TAG, "HBM sysfs node enabled");
-        }, 100);
+        // 3.Write HBM sysfs node; the kernel additionally freezes ADFR min-fps
+        // at max while hbm_max is active
+        FileUtils.writeLine(Constants.NODE_HBM, "1");
+        mSharedPrefs.edit().putBoolean(Constants.KEY_HBM, true).commit();
+        Log.i(TAG, "HBM sysfs node enabled");
     }
 
     private void disableHbmInternal() {
@@ -141,36 +145,36 @@ public class HbmController {
             Log.i(TAG, "Auto-brightness restored");
         }
 
-        // 2.Restore refresh rates
-        float backedUpMinRefreshRate = mSharedPrefs.getFloat(KEY_BACKUP_MIN_REFRESH_RATE, MIN);
-        float backedUpMaxRefreshRate = mSharedPrefs.getFloat(KEY_BACKUP_MAX_REFRESH_RATE, MAX);
+        // 2.Restore the refresh rates that were pinned to 120Hz while HBM was on
+        // (also covers backups left behind by older builds)
+        if (mSharedPrefs.contains(KEY_BACKUP_MIN_REFRESH_RATE)
+                || mSharedPrefs.contains(KEY_BACKUP_MAX_REFRESH_RATE)) {
+            float backedUpMinRefreshRate = mSharedPrefs.getFloat(KEY_BACKUP_MIN_REFRESH_RATE, MIN);
+            float backedUpMaxRefreshRate = mSharedPrefs.getFloat(KEY_BACKUP_MAX_REFRESH_RATE, MAX);
 
-        Log.i(TAG, "Restoring refresh rates - MIN: " + backedUpMinRefreshRate + ", MAX: " + backedUpMaxRefreshRate);
+            Log.i(TAG, "Restoring refresh rates - MIN: "
+                    + backedUpMinRefreshRate + ", MAX: " + backedUpMaxRefreshRate);
 
-        Settings.System.putFloatForUser(mContext.getContentResolver(),
-                Settings.System.MIN_REFRESH_RATE, backedUpMinRefreshRate,
-                UserHandle.USER_CURRENT);
-        Settings.System.putFloatForUser(mContext.getContentResolver(),
-                Settings.System.PEAK_REFRESH_RATE, backedUpMaxRefreshRate,
-                UserHandle.USER_CURRENT);
+            Settings.System.putFloatForUser(mContext.getContentResolver(),
+                    Settings.System.MIN_REFRESH_RATE, backedUpMinRefreshRate,
+                    UserHandle.USER_CURRENT);
+            Settings.System.putFloatForUser(mContext.getContentResolver(),
+                    Settings.System.PEAK_REFRESH_RATE, backedUpMaxRefreshRate,
+                    UserHandle.USER_CURRENT);
+        }
 
-        Log.i(TAG, "HBM disabled - refresh rates restored");
+        // 3. Disable HBM sysfs node
+        FileUtils.writeLine(Constants.NODE_HBM, "0");
+        mSharedPrefs.edit().putBoolean(Constants.KEY_HBM, false).commit();
 
-        // 3. Disable HBM sysfs node with delay
-        final Handler handler = new Handler(Looper.getMainLooper());
-        handler.postDelayed(() -> {
-            FileUtils.writeLine(Constants.NODE_HBM, "0");
-            mSharedPrefs.edit().putBoolean(Constants.KEY_HBM, false).commit();
+        // Clear backed up values
+        mSharedPrefs.edit()
+                .remove(KEY_BACKUP_MIN_REFRESH_RATE)
+                .remove(KEY_BACKUP_MAX_REFRESH_RATE)
+                .remove(KEY_BACKUP_AUTO_BRIGHTNESS)
+                .apply();
 
-            // Clear backed up values
-            mSharedPrefs.edit()
-                    .remove(KEY_BACKUP_MIN_REFRESH_RATE)
-                    .remove(KEY_BACKUP_MAX_REFRESH_RATE)
-                    .remove(KEY_BACKUP_AUTO_BRIGHTNESS)
-                    .apply();
-
-            Log.i(TAG, "HBM sysfs node disabled, backup cleared");
-        }, 100);
+        Log.i(TAG, "HBM sysfs node disabled, backup cleared");
     }
 
     private boolean isAutoBrightnessEnabled() {

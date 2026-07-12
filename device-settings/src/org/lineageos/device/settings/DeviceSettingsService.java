@@ -27,10 +27,12 @@ import org.lineageos.device.settings.bypasschrg.BypassChargingController;
 import org.lineageos.device.settings.bypasschrg.BypassChargingManager;
 import org.lineageos.device.settings.display.DisplayModeController;
 import org.lineageos.device.settings.display.HbmController;
+import org.lineageos.device.settings.display.PwmController;
 import org.lineageos.device.settings.gamebar.GameBar;
 import org.lineageos.device.settings.gamebar.GameBarMonitorService;
 import org.lineageos.device.settings.refreshrate.RefreshRateController;
 import org.lineageos.device.settings.refreshrate.RefreshRateMonitorService;
+import org.lineageos.device.settings.utils.FileUtils;
 
 public class DeviceSettingsService extends Service {
     private static final String TAG = "DeviceSettingsService";
@@ -72,6 +74,8 @@ public class DeviceSettingsService extends Service {
 
     private void initializeSubsystems() {
         initializeBypassCharging();
+        initializePwm();
+        initializeTestTe();
         initializeGameBar();
         initializeRefreshRate();
     }
@@ -80,10 +84,39 @@ public class DeviceSettingsService extends Service {
         if (Constants.DEBUG) Log.i(TAG, "Initializing BypassCharging");
         try {
             BypassChargingController controller = BypassChargingController.getInstance(this);
+            // The kernel charging vote does not survive a reboot (and a stale vote can
+            // survive an app crash), so sync the hardware with the persisted state first
+            controller.reconcileHardwareState();
             BypassChargingManager.notifyStateChanged(this, controller.getState());
             if (Constants.DEBUG) Log.i(TAG, "BypassCharging initialized");
         } catch (Exception e) {
             Log.e(TAG, "Failed to initialize BypassCharging", e);
+        }
+    }
+
+    private void initializePwm() {
+        if (Constants.DEBUG) Log.i(TAG, "Initializing PWM");
+        try {
+            PwmController.getInstance(this).restorePwmSetting();
+            if (Constants.DEBUG) Log.i(TAG, "PWM initialized");
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to initialize PWM", e);
+        }
+    }
+
+    private void initializeTestTe() {
+        // Enable the panel test-TE irq so the node reports the real DDIC
+        // self-refresh rate, consumed by the SurfaceFlinger "Show refresh rate"
+        // overlay via ro.surface_flinger.panel_refresh_rate_node
+        try {
+            if (FileUtils.isFileWritable(Constants.NODE_TEST_TE)) {
+                FileUtils.writeLine(Constants.NODE_TEST_TE, "1");
+                if (Constants.DEBUG) Log.i(TAG, "Test-TE counter enabled");
+            } else {
+                Log.w(TAG, "Test-TE node is not writable");
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to enable test-TE counter", e);
         }
     }
 
@@ -239,7 +272,14 @@ public class DeviceSettingsService extends Service {
 
     private void handlePowerDisconnected() {
         if (Constants.DEBUG) Log.i(TAG, "Power DISCONNECTED");
-        // No action needed - hardware bypass is irrelevant without power
-        // BypassChargingController state remains for next connect
+
+        // Re-enable charging in the kernel: the vote survives replug, so a stale
+        // "charging disabled" would silently prevent charging on the next connect
+        // if this app were not running then. Global prefs are kept for next connect.
+        try {
+            BypassChargingController.getInstance(this).handlePowerDisconnected();
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to handle power disconnected", e);
+        }
     }
 }
