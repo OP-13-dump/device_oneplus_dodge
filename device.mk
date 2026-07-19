@@ -34,7 +34,7 @@ PRODUCT_SYSTEM_PROPERTIES += \
 # Fingerprint
 TARGET_HAS_UDFPS := true
 
-# LiveDisplay
+# LiveDisplay (PA crash fixed in frameworks/base 7d536ea / local 2892b8bd658f)
 $(call soong_config_set_bool,OPLUS_LINEAGE_LIVEDISPLAY_HAL,ENABLE_AF,true)
 
 # Maintainer
