@@ -37,3 +37,8 @@ BOARD_SYSTEM_EXT_PRIVATE_SEPOLICY_DIRS += $(DEVICE_PATH)/sepolicy/private
 include vendor/oneplus/dodge/BoardConfigVendor.mk
 
 BUILD_BROKEN_VENDOR_PROPERTY_NAMESPACE := true
+
+# Fusion light sensor — added by apply-fusion-port.sh
+TARGET_USES_OPLUS_FUSIONLIGHT := true
+TARGET_FUSIONLIGHT_ENABLE := true
+BOARD_VENDOR_SEPOLICY_DIRS += vendor/oplus/fusionlight/sepolicy/vendor

@@ -128,3 +128,6 @@ $(call inherit-product, vendor/oneplus/dodge/dodge-vendor.mk)
 
 # Camera
 $(call inherit-product-if-exists, vendor/oplus/camera/opluscamera.mk)
+
+# Fusion light sensor (content-immune ALS) — added by apply-fusion-port.sh
+$(call inherit-product-if-exists, vendor/oplus/fusionlight/fusionlight.mk)
