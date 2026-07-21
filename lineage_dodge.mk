@@ -14,6 +14,14 @@ $(call inherit-product, device/oneplus/dodge/device.mk)
 # Inherit some common Lineage stuff.
 $(call inherit-product, vendor/lineage/config/common_full_phone.mk)
 
+# LunarisAOSP Flags
+LUNARIS_BUILD_TYPE := OFFICIAL
+TARGET_CUSTOM_UDFPS := true
+TARGET_USE_FILES := false
+TARGET_USE_GPHOTOS := true
+BYPASS_CHARGE_SUPPORTED := true
+WITH_GMS := true
+
 PRODUCT_NAME := lineage_dodge
 PRODUCT_DEVICE := dodge
 PRODUCT_MANUFACTURER := OnePlus
