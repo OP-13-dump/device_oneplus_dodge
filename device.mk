@@ -72,6 +72,10 @@ PRODUCT_COPY_FILES += \
     $(LOCAL_PATH)/recovery/root/vendor/odm/etc/23893/build.NA.prop:$(TARGET_COPY_OUT_ODM)/etc/23893/build.NA.prop \
     $(LOCAL_PATH)/recovery/root/vendor/odm/etc/23893/build.default.prop:$(TARGET_COPY_OUT_ODM)/etc/23893/build.default.prop
 
+# RemovePackages
+ PRODUCT_PACKAGES += \
+     RemovePackagesDodge
+
 # Soong namespaces
 PRODUCT_SOONG_NAMESPACES += \
     $(LOCAL_PATH)

@@ -1,0 +1,31 @@
+cc_prebuilt_binary {
+     name: "RemovePackagesDodge",
+     overrides: [
+        "AmbientSensePrebuilt",
+ 	"arcore",
+ 	"Chrome",
+ 	"Chrome-Stub",
+ 	"DevicePolicyPrebuilt",
+        "GoogleTTS",
+        "Maps",
+        "PixelBuds",
+        "RecorderPrebuilt",
+        "YouTube",
+        "YouTubeMusicPrebuilt",
+        "GooglePrintRecommendationService",
+        "GoogleFeedback",
+        "KidsSupervisionStub",
+        "MaestroPrebuilt",
+	"PrebuiltGmail",
+	"WeatherPixelPrebuilt_24D1",
+	"SafetyHubSuwPrebuilt",
+	"Matlog",
+	"Twelve",
+	"Jelly"
+     ],
+     strip: {
+         none: true,
+     },
+     srcs: ["RemovePackagesDodge"],
+     check_elf_files: false,
+}
