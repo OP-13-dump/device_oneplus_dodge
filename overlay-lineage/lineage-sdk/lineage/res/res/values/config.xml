@@ -5,15 +5,18 @@
      SPDX-License-Identifier: Apache-2.0
 -->
 <resources>
-    <!-- Paths to the libraries that contain device specific key handlers -->
+    <!-- Paths to the libraries that contain device specific key handlers.
+         Use DeviceSettings (flashlight blink / custom usages), not the stock
+         hardware/oplus KeyHandler which only does ringer/zen/torch and
+         overwrites DeviceSettings alert-slider preferences. -->
     <string-array name="config_deviceKeyHandlerLibs" translatable="false">
-        <item>/system_ext/app/KeyHandler/KeyHandler.apk</item>
+        <item>/system_ext/priv-app/DeviceSettings/DeviceSettings.apk</item>
         <item>/system_ext/priv-app/LineageParts/LineageParts.apk</item>
     </string-array>
 
     <!-- Names of the key handler classes -->
     <string-array name="config_deviceKeyHandlerClasses" translatable="false">
-        <item>org.lineageos.settings.device.KeyHandler</item>
+        <item>org.lineageos.device.settings.KeyHandler</item>
         <item>org.lineageos.lineageparts.gestures.KeyHandler</item>
     </string-array>
 

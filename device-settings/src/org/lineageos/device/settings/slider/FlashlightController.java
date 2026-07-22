@@ -111,6 +111,9 @@ public final class FlashlightController extends SliderControllerBase {
 
     private boolean setTorchMode(boolean enabled) {
         if (mCameraId == null) {
+            mCameraId = getCameraId();
+        }
+        if (mCameraId == null) {
             Log.e(TAG, "Camera is not available");
             return false;
         }

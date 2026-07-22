@@ -9,8 +9,10 @@ PRODUCT_AAPT_CONFIG := normal
 PRODUCT_AAPT_PREF_CONFIG := xxxhdpi
 
 # Alert slider
+# DeviceSettings owns the tri-state KeyHandler (custom usages incl. flashlight
+# blink). Do not also package hardware/oplus KeyHandler — PhoneWindowManager
+# would load it from lineage-sdk and overwrite DeviceSettings slider actions.
 PRODUCT_PACKAGES += \
-    KeyHandler \
     DeviceSettings \
     tri-state-key-calibrate
 
@@ -46,7 +48,6 @@ DEVICE_PACKAGE_OVERLAYS += \
 
 PRODUCT_PACKAGES += \
     FrameworksResTargetEuicc \
-    KeyHandlerResTarget \
     OPlusFrameworksResTarget \
     OPlusSettingsProviderResTarget \
     OPlusSettingsResTarget \
