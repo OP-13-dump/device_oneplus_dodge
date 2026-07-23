@@ -36,6 +36,10 @@ public abstract class SliderControllerBase {
 
     private int[] mActions = null;
 
+    /** Set by subclasses before returning from processAction to attach a
+     *  package name to the position feedback broadcast (app-launch mode). */
+    protected String mFeedbackPackage = null;
+
     public SliderControllerBase(Context context) {
         mContext = context;
         mVibrator = (Vibrator) context.getSystemService(Context.VIBRATOR_SERVICE);
@@ -62,9 +66,17 @@ public abstract class SliderControllerBase {
     }
 
     public static void sendUpdateBroadcast(Context context, int position, int result) {
+        sendUpdateBroadcast(context, position, result, null);
+    }
+
+    public static void sendUpdateBroadcast(Context context, int position, int result,
+            String packageName) {
         Intent intent = new Intent(Constants.ACTION_UPDATE_SLIDER_POSITION);
         intent.putExtra(Constants.EXTRA_SLIDER_POSITION, position);
         intent.putExtra(Constants.EXTRA_SLIDER_POSITION_VALUE, result);
+        if (packageName != null) {
+            intent.putExtra(Constants.EXTRA_SLIDER_PACKAGE, packageName);
+        }
         context.sendBroadcastAsUser(intent, UserHandle.CURRENT);
         intent.setFlags(Intent.FLAG_RECEIVER_REGISTERED_ONLY);
         Log.i(TAG, "slider change to positon " + position);
@@ -80,9 +92,10 @@ public abstract class SliderControllerBase {
 
         try {
             int state = Integer.parseInt(FileUtils.readLine(Constants.NODE_SLIDER_STATE).trim());
+            mFeedbackPackage = null;
             ret = processAction(mActions[state - 1]);
             if (ret > 0 && notify) {
-                sendUpdateBroadcast(context, state - 1, ret);
+                sendUpdateBroadcast(context, state - 1, ret, mFeedbackPackage);
             }
         } catch (Exception e) {
             Log.e(TAG, "Failed to restore slider state", e);
