@@ -44,8 +44,14 @@ public class Constants {
     public static final String KEY_NOTIF_SLIDER_ACTION_MIDDLE = "action_middle_position";
     public static final String KEY_NOTIF_SLIDER_ACTION_BOTTOM = "action_bottom_position";
 
+    /* Per-position apps for the app-launch slider usage */
+    public static final String KEY_NOTIF_SLIDER_APP_TOP = "slider_app_top_position";
+    public static final String KEY_NOTIF_SLIDER_APP_MIDDLE = "slider_app_middle_position";
+    public static final String KEY_NOTIF_SLIDER_APP_BOTTOM = "slider_app_bottom_position";
+
     public static final String EXTRA_SLIDER_USAGE = "usage";
     public static final String EXTRA_SLIDER_ACTIONS = "actions";
+    public static final String EXTRA_SLIDER_APPS = "slider_apps";
 
     public static final String NOTIF_SLIDER_FOR_NOTIFICATION = "1";
     public static final String NOTIF_SLIDER_FOR_FLASHLIGHT = "2";
@@ -53,6 +59,7 @@ public class Constants {
     public static final String NOTIF_SLIDER_FOR_ROTATION = "4";
     public static final String NOTIF_SLIDER_FOR_RINGER = "5";
     public static final String NOTIF_SLIDER_FOR_NOTIFICATION_RINGER = "6";
+    public static final String NOTIF_SLIDER_FOR_APPLAUNCH = "7";
 
     public static final String ACTION_UPDATE_SLIDER_POSITION
             = "org.lineageos.device.settings.UPDATE_SLIDER_POSITION";
