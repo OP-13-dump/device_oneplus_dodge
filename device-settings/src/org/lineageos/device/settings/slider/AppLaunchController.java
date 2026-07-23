@@ -18,13 +18,18 @@ package org.lineageos.device.settings.slider;
 
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.PowerManager;
 import android.os.SystemClock;
 import android.os.UserHandle;
 import android.text.TextUtils;
 import android.util.Log;
+import android.widget.Toast;
 
 import org.lineageos.device.settings.Constants;
+import org.lineageos.device.settings.R;
 import org.lineageos.device.settings.SliderControllerBase;
 import org.lineageos.device.settings.utils.FileUtils;
 
@@ -37,6 +42,7 @@ public final class AppLaunchController extends SliderControllerBase {
     private static final int APP_LAUNCH = 70;
 
     private final PowerManager mPowerManager;
+    private final Handler mHandler = new Handler(Looper.getMainLooper());
 
     // Per-position package names (top, middle, bottom), delivered via
     // EXTRA_SLIDER_APPS since this runs in system_server and cannot read
@@ -92,13 +98,39 @@ public final class AppLaunchController extends SliderControllerBase {
             }
             mContext.startActivityAsUser(intent, UserHandle.CURRENT);
             Log.i(TAG, "Launched " + pkg);
+            showLaunchToast(pkg);
         } catch (Exception e) {
             Log.e(TAG, "Failed to launch " + pkg, e);
         }
 
-        // Return 0: the app opening is the feedback, don't trigger the
-        // SystemUI tri-state dialog (it has no icon for this mode).
+        // Return 0: don't trigger the SystemUI tri-state dialog, it has
+        // no icon for this mode; the toast is the feedback instead.
         return 0;
+    }
+
+    private void showLaunchToast(String pkg) {
+        PackageManager pm = mContext.getPackageManager();
+        CharSequence label = pkg;
+        try {
+            label = pm.getApplicationInfo(pkg, 0).loadLabel(pm);
+        } catch (PackageManager.NameNotFoundException ignored) {
+        }
+
+        // We run in system_server: mContext has no access to this APK's
+        // resources, so resolve the string through a package context.
+        String text;
+        try {
+            Context pkgContext = mContext.createPackageContext(
+                    "org.lineageos.device.settings", 0);
+            text = pkgContext.getString(
+                    R.string.notification_slider_app_launching, label);
+        } catch (Exception e) {
+            text = String.valueOf(label);
+        }
+
+        final String msg = text;
+        mHandler.post(() ->
+                Toast.makeText(mContext, msg, Toast.LENGTH_SHORT).show());
     }
 
     @Override
