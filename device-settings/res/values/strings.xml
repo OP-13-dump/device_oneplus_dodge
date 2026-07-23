@@ -36,6 +36,11 @@
     <string name="notification_slider_for_rotation">Rotation</string>
     <string name="notification_slider_for_ringer">Ringer</string>
     <string name="notification_slider_for_notification_ringer">Notification and ringer</string>
+    <string name="notification_slider_for_applaunch">Launch app</string>
+    <string name="notification_slider_applaunch_launch">Launch app</string>
+    <string name="notification_slider_app_none">No app selected</string>
+    <string name="notification_slider_app_dialog_title">Select app</string>
+    <string name="notification_slider_app_clear">Clear</string>
     <string name="notification_slider_flashlight_off">Off</string>
     <string name="notification_slider_flashlight_on">On</string>
     <string name="notification_slider_flashlight_blink">Blink</string>
