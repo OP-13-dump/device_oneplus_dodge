@@ -50,6 +50,28 @@
             android:dialogTitle="@string/notification_slider_selection_dialog_title"
             android:title="@string/notification_slider_bottom_position"
             android:summary="%s" />
+
+        <!-- App pickers, only visible when slider usage is "Launch app" -->
+        <Preference
+            android:key="slider_app_top_position"
+            android:icon="@drawable/ic_up_icon"
+            android:title="@string/notification_slider_top_position"
+            android:summary="@string/notification_slider_app_none"
+            android:persistent="false" />
+
+        <Preference
+            android:key="slider_app_middle_position"
+            android:icon="@drawable/ic_middle_icon"
+            android:title="@string/notification_slider_middle_position"
+            android:summary="@string/notification_slider_app_none"
+            android:persistent="false" />
+
+        <Preference
+            android:key="slider_app_bottom_position"
+            android:icon="@drawable/ic_down_icon"
+            android:title="@string/notification_slider_bottom_position"
+            android:summary="@string/notification_slider_app_none"
+            android:persistent="false" />
     </PreferenceCategory>
 
     <PreferenceCategory
