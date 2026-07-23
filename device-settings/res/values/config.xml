@@ -60,4 +60,11 @@
         <item>64</item>
         <item>63</item>
     </string-array>
+
+    <!-- The default actions of slider when used to launch apps -->
+    <string-array name="config_defaultSliderActionsForApplaunch" translatable="false">
+        <item>70</item>
+        <item>70</item>
+        <item>70</item>
+    </string-array>
 </resources>
