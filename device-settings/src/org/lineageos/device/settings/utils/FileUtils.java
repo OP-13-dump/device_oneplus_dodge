@@ -71,7 +71,7 @@ public final class FileUtils {
             }
         }
 
-        return trim ? line.trim() : line;
+        return (trim && line != null) ? line.trim() : line;
     }
 
     /**
