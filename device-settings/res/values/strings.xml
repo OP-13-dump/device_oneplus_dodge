@@ -41,6 +41,7 @@
     <string name="notification_slider_app_none">No app selected</string>
     <string name="notification_slider_app_dialog_title">Select app</string>
     <string name="notification_slider_app_clear">Clear</string>
+    <string name="notification_slider_app_launching">Launching <xliff:g id="app_name" example="Camera">%1$s</xliff:g></string>
     <string name="notification_slider_flashlight_off">Off</string>
     <string name="notification_slider_flashlight_on">On</string>
     <string name="notification_slider_flashlight_blink">Blink</string>
