@@ -16,8 +16,8 @@
 -->
 <resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
 
-    <string name="device_title">OnePlus Settings</string>
-    <string name="device_summary">Extra settings for OnePlus Ace3 | 12R</string>
+    <string name="device_title">Dodge Hub</string>
+    <string name="device_summary">Extra settings for OnePlus 13</string>
 
     <!-- Notification slider -->
     <string name="notification_slider_category_title">Переключатель режима</string>
