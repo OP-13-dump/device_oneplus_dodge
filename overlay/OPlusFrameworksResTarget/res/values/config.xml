@@ -106,7 +106,7 @@
          safe and correct here: it fires on the very first non-interactive frame,
          so even a sub-second lock/unlock (which a 2000ms value missed) forgets the
          manual set and unlock returns to the auto curve. -->
-    <integer name="config_autoBrightnessShortTermModelTimeout">0</integer>
+    <integer name="config_autoBrightnessShortTermModelTimeout">15000</integer>
     <bool name="config_autoBrightnessResetShortTermModelOnScreenOff">true</bool>
 
     <!-- Screen brightness used to dim the screen when the user activity
