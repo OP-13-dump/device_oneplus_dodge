@@ -1525,6 +1525,9 @@ odm/firmware/tp/23821/sys_touch_function_feature_config.xml
 odm/firmware/tp/23821/sys_touch_scene_config.xml
 
 # Vibration effects
+odm/etc/vibrator/9999/def/effect_0.bin
+odm/etc/vibrator/9999/def/effect_1.bin
+odm/etc/vibrator/9999/def/effect_2.bin
 odm/etc/vibrator/9999/def/effect_10.bin
 odm/etc/vibrator/9999/def/effect_100.bin
 odm/etc/vibrator/9999/def/effect_101.bin
@@ -1618,6 +1621,17 @@ odm/etc/vibrator/9999/soft/effect_6.bin
 odm/etc/vibrator/9999/soft/effect_7.bin
 odm/etc/vibrator/9999/soft/effect_8.bin
 odm/etc/vibrator/vibrator_effect.json
+
+# Vibrator (stock richtap HAL)
+odm/bin/hw/vendor.oplus.hardware.vibrator-service
+odm/etc/init/vibrator-default.rc
+odm/etc/vintf/manifest/vibrator-default.xml
+odm/lib64/libaacvibrator.so
+odm/lib64/liboplusvibratoreffect.so
+odm/lib64/libsivibrator.so
+odm/lib64/vendor.aac.hardware.richtap.vibrator-V2-ndk.so
+odm/lib64/vendor.oplus.hardware.oplusvibrator-V2-ndk.so
+odm/lib64/vendor.oplus.hardware.vibrator-V1-ndk.so
 
 # WiFi
 odm/etc/wifi/peach/bdwlan.b0a
