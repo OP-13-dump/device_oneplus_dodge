@@ -99,11 +99,11 @@ $(call soong_config_set_bool,OPLUS_LINEAGE_TOUCH_HAL,ENABLE_GM,true)
 $(call soong_config_set_bool,OPLUS_LINEAGE_TOUCH_HAL,ENABLE_HTPR,false)
 
 # Vibrator
-PRODUCT_COPY_FILES += \
-    $(LOCAL_PATH)/configs/vibrator/def/effect_0.bin:$(TARGET_COPY_OUT_ODM)/etc/vibrator/9999/def/effect_0.bin\
-    $(LOCAL_PATH)/configs/vibrator/def/effect_1.bin:$(TARGET_COPY_OUT_ODM)/etc/vibrator/9999/def/effect_1.bin\
-    $(LOCAL_PATH)/configs/vibrator/def/effect_2.bin:$(TARGET_COPY_OUT_ODM)/etc/vibrator/9999/def/effect_2.bin\
-    $(LOCAL_PATH)/configs/vibrator/def/effect_21.bin:$(TARGET_COPY_OUT_ODM)/etc/vibrator/9999/def/effect_21.bin
+# Stock OOS richtap HAL blob stack (vendor/oneplus/dodge) replaces the
+# source-built QTI HAL; effect bins revert to the stock id layout since the
+# blob HAL does its own OOS-correct effect mapping. The AOSP-id remap copies
+# stay in configs/vibrator for an easy flip back to the QTI HAL.
+TARGET_USES_OPLUS_VIBRATOR_BLOBS := true
 
 $(call soong_config_set_bool,OPLUS_LINEAGE_VIBRATOR_HAL,USE_EFFECT_STREAM,true)
 $(call soong_config_set,OPLUS_LINEAGE_VIBRATOR_HAL,INCLUDE_DIR,$(LOCAL_PATH)/vibrator/include)
