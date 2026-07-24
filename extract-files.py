@@ -44,7 +44,6 @@ blob_fixups: blob_fixups_user_type = {
         .add_needed('libapsfixup.so'),
     (
         'odm/lib64/libAncHumanSegFigureFusion.so',
-        'odm/lib64/libEIS.so',
         'odm/lib64/libEISLive.so',
         'odm/lib64/libHIS.so',
         'odm/lib64/libOPAlgoCamAiBeautyFaceRetouchCn.so',
@@ -58,6 +57,36 @@ blob_fixups: blob_fixups_user_type = {
         .clear_symbol_version('AHardwareBuffer_lockPlanes')
         .clear_symbol_version('AHardwareBuffer_release')
         .clear_symbol_version('AHardwareBuffer_unlock'),
+    # TIME-LAPSE / hyperlapse saves solid green. LibEIS reads a bogus pixel format from the
+    # buffer handle (often the frame width, e.g. 4096) and passes it to
+    # ShareBuffer_CreateFromNativeHandle. eglCreateImageKHR then fails (EGL_BAD_ATTRIBUTE /
+    # 12300) and the deferred hyperlapse path encodes empty green frames. Force
+    # HAL_PIXEL_FORMAT_YCbCr_420_888 (0x23) at the four CreateFromNativeHandle call sites:
+    # ldr w4,[xN,#0x2c] -> mov w4,#0x23 (52800464).
+    'odm/lib64/libEIS.so': blob_fixup()
+        .clear_symbol_version('AHardwareBuffer_acquire')
+        .clear_symbol_version('AHardwareBuffer_allocate')
+        .clear_symbol_version('AHardwareBuffer_describe')
+        .clear_symbol_version('AHardwareBuffer_lock')
+        .clear_symbol_version('AHardwareBuffer_lockPlanes')
+        .clear_symbol_version('AHardwareBuffer_release')
+        .clear_symbol_version('AHardwareBuffer_unlock')
+        .binary_regex_replace(
+            b'\x84\x2e\x40\xb9\xe1\x8b\x44\x29\xe3\x2f\x40\xb9\x05\x40\x80\x52',
+            b'\x64\x04\x80\x52\xe1\x8b\x44\x29\xe3\x2f\x40\xb9\x05\x40\x80\x52',
+        )
+        .binary_regex_replace(
+            b'\x04\x2f\x40\xb9\x05\x20\x80\x52\x45\x00\xa0\x72\xe0\x03\x18\xaa',
+            b'\x64\x04\x80\x52\x05\x20\x80\x52\x45\x00\xa0\x72\xe0\x03\x18\xaa',
+        )
+        .binary_regex_replace(
+            b'\xff\x03\x00\xf9\x28\x10\x40\xf9\x04\x2c\x40\xb9\x01\x89\x40\x29\x86\xc2\xff\x97',
+            b'\xff\x03\x00\xf9\x28\x10\x40\xf9\x64\x04\x80\x52\x01\x89\x40\x29\x86\xc2\xff\x97',
+        )
+        .binary_regex_replace(
+            b'\xff\x03\x00\xf9\x28\x10\x40\xf9\x04\x2c\x40\xb9\x01\x89\x40\x29\x39\xc2\xff\x97',
+            b'\xff\x03\x00\xf9\x28\x10\x40\xf9\x64\x04\x80\x52\x01\x89\x40\x29\x39\xc2\xff\x97',
+        ),
     # Master/Pro-mode photos come out with RED/BLUE swapped. Pro mode captures RAW10 and the
     # OnePlus OCCE tone-mapper (libBasicTonePhoto.so) runs an OpenGL shader whose body contains a
     # U/V (Cb/Cr) reorder `dstYuv = vec4(dstYuv.r, dstYuv.b, dstYuv.g, 1.0)`. On this port the net
