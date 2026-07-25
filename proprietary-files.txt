@@ -1309,7 +1309,11 @@ vendor/lib64/libswregistrationalgo.so
 vendor/lib64/libtfestriping.so
 vendor/lib64/libubifocus.so
 vendor/lib64/libvideoml.so
+# QTI aon-V1/V2-ndk omitted — built from vendor/qcom/opensource/interfaces (aidl_interface vendor.qti.hardware.camera.aon)
 vendor/lib64/vendor.qti.hardware.camera.aon-service-impl.so
+# odm copy kept for aon-service-impl; vendor copy omitted — conflicts with
+# hardware/oplus interfaces shim (system_ext + vendor_available).
+odm/lib64/vendor.oplus.hardware.camera.aon-V1-ndk_platform.so;MODULE_SUFFIX=.odm
 vendor/lib64/vendor.qti.hardware.camera.offlinecamera-service-impl.so
 
 # Camera firmware
@@ -1626,8 +1630,8 @@ odm/etc/vibrator/vibrator_effect.json
 odm/bin/hw/vendor.oplus.hardware.vibrator-service
 odm/etc/init/vibrator-default.rc
 odm/etc/vintf/manifest/vibrator-default.xml
-odm/lib64/libaacvibrator.so
-odm/lib64/liboplusvibratoreffect.so
+odm/lib64/libaacvibrator.so:vendor/lib64/libaacvibrator.so
+odm/lib64/liboplusvibratoreffect.so:vendor/lib64/liboplusvibratoreffect.so
 odm/lib64/libsivibrator.so
 odm/lib64/vendor.aac.hardware.richtap.vibrator-V2-ndk.so
 odm/lib64/vendor.oplus.hardware.oplusvibrator-V2-ndk.so
