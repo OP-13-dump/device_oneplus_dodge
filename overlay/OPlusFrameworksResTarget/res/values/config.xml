@@ -90,15 +90,24 @@
     <!-- Light sensor event rate in milliseconds for automatic brightness control. -->
     <integer name="config_autoBrightnessLightSensorRate">200</integer>
 
-    <!-- How long (ms) a manual brightness set is remembered by the adaptive
-         short-term model. AOSP default is 300000 (5 min): drag the slider to
-         (say) minimum and auto-brightness biases the whole curve down at that
-         lux, so it stays "stuck" at min across screen off/on for the next five
-         minutes instead of ramping back to the sensor curve. 15000 (15s) makes
-         a manual nudge nearly transient — it holds just long enough to feel
-         intentional, then the sensor curve takes back over, matching the
-         snappier OnePlus/OOS feel. -->
-    <integer name="config_autoBrightnessShortTermModelTimeout">15000</integer>
+    <!-- Manual brightness in auto mode is session-only: forgotten on lock.
+
+         The adaptive short-term model records a manual slider set as a
+         (lux -> brightness) point and warps the auto curve toward it. Stock AOSP
+         keeps that point at a similar ambient lux even after its timeout — it is
+         only cleared once the light changes past anchor*0.6 — so a manual min
+         "sticks" across lock/unlock in unchanged light and never ramps back.
+
+         config_autoBrightnessResetShortTermModelOnScreenOff makes the timeout do
+         a FULL reset instead of a mere invalidate, so any screen-off clears the
+         manual set unconditionally. The timeout is scheduled only on the
+         transition to a non-interactive policy and is cancelled the instant the
+         screen comes back on, so it NEVER counts during active use — meaning 0 is
+         safe and correct here: it fires on the very first non-interactive frame,
+         so even a sub-second lock/unlock (which a 2000ms value missed) forgets the
+         manual set and unlock returns to the auto curve. -->
+    <integer name="config_autoBrightnessShortTermModelTimeout">0</integer>
+    <bool name="config_autoBrightnessResetShortTermModelOnScreenOff">true</bool>
 
     <!-- Screen brightness used to dim the screen when the user activity
          timeout expires.  May be less than the minimum allowed brightness setting
