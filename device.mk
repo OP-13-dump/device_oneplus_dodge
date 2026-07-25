@@ -99,27 +99,16 @@ $(call soong_config_set_bool,OPLUS_LINEAGE_TOUCH_HAL,ENABLE_GM,true)
 $(call soong_config_set_bool,OPLUS_LINEAGE_TOUCH_HAL,ENABLE_HTPR,false)
 
 # Vibrator
-# Stock OOS richtap HAL blob stack (vendor/oneplus/dodge) replaces the
-# source-built QTI HAL; the blob HAL does its own OOS-correct effect mapping
-# so it reads the stock bin layout shipped from the vendor tree.
+# Source RichTap HAL (hardware/oplus) drives the stock libaacvibrator engine
+# and remaps AOSP effect ids to RichTap's internal prebaked ids, so IVibrator
+# perform() plays the real stock waveforms instead of a generic fallback.
+# TARGET_USES_OPLUS_VIBRATOR_BLOBS keeps the source-built QTI HAL out of the
+# build; the richtap HAL serves IVibrator instead (blob service dropped in the
+# vendor tree, its libaacvibrator/effect libs are kept for the HAL to link).
 TARGET_USES_OPLUS_VIBRATOR_BLOBS := true
 
-# AOSP prebaked effects. Stock ships a crisp (def) and a gentle (soft) set,
-# switched by an OOS Settings toggle AOSP never calls, so it defaults to the
-# hard/rough crisp set. CLICK/DOUBLE_CLICK/TICK/THUD/POP (0-4) use the stock
-# soft-style waveforms (smooth, verified on-device); HEAVY_CLICK (5) has no
-# soft variant so it stays def amplitude-scaled to 60%. These copies precede
-# the vendor-tree inherit so they win; the other ~66 bins ship stock.
-PRODUCT_COPY_FILES += \
-    $(LOCAL_PATH)/configs/vibrator/def/effect_0.bin:$(TARGET_COPY_OUT_ODM)/etc/vibrator/9999/def/effect_0.bin \
-    $(LOCAL_PATH)/configs/vibrator/def/effect_1.bin:$(TARGET_COPY_OUT_ODM)/etc/vibrator/9999/def/effect_1.bin \
-    $(LOCAL_PATH)/configs/vibrator/def/effect_2.bin:$(TARGET_COPY_OUT_ODM)/etc/vibrator/9999/def/effect_2.bin \
-    $(LOCAL_PATH)/configs/vibrator/def/effect_3.bin:$(TARGET_COPY_OUT_ODM)/etc/vibrator/9999/def/effect_3.bin \
-    $(LOCAL_PATH)/configs/vibrator/def/effect_4.bin:$(TARGET_COPY_OUT_ODM)/etc/vibrator/9999/def/effect_4.bin \
-    $(LOCAL_PATH)/configs/vibrator/def/effect_5.bin:$(TARGET_COPY_OUT_ODM)/etc/vibrator/9999/def/effect_5.bin
-
-$(call soong_config_set_bool,OPLUS_LINEAGE_VIBRATOR_HAL,USE_EFFECT_STREAM,true)
-$(call soong_config_set,OPLUS_LINEAGE_VIBRATOR_HAL,INCLUDE_DIR,$(LOCAL_PATH)/vibrator/include)
+PRODUCT_PACKAGES += \
+    android.hardware.vibrator.service.oplus-richtap
 
 # Inherit from the common OEM chipset makefile.
 $(call inherit-product, device/oneplus/sm8750-common/common.mk)
