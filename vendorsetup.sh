@@ -7,3 +7,5 @@ git clone -b 16.2 https://github.com/OP-13-dump/kernel_oneplus_sm8750-devicetree
 git clone -b 16.2 https://github.com/OP-13-dump/hardware_oplus hardware/oplus
 git clone -b 16.2 https://github.com/OP-13-dump/vendor_oneplus_ir vendor/oneplus/ir
 git clone -b 16.2 https://github.com/Lunaris-AOSP/vendor_lunaris-priv_keys.git vendor/lunaris-priv/keys
+git clone -b 16.2 https://github.com/dodgecameraport/vendor_oplus_camera.git vendor/oplus/camera
+git clone -b alpha-16.2 https://gitlab.com/osm1019/proprietary_vendor_oplus_camera.git vendor/oplus/camera/camera
