@@ -105,11 +105,11 @@ $(call soong_config_set_bool,OPLUS_LINEAGE_TOUCH_HAL,ENABLE_HTPR,false)
 TARGET_USES_OPLUS_VIBRATOR_BLOBS := true
 
 # The six AOSP prebaked effects (CLICK/DOUBLE_CLICK/TICK/THUD/POP/HEAVY_CLICK)
-# are the stock def-style waveforms amplitude-scaled to 75%. Stock only ships a
+# are the stock def-style waveforms amplitude-scaled to 60%. Stock only ships a
 # crisp (def) and a gentle (soft) set, switched by an OOS Settings toggle AOSP
-# never calls, leaving everything on the hard crisp set; 0.75 lands a middle
-# ground (verified on-device). These copies precede the vendor-tree inherit so
-# they win; the other ~66 effect bins still ship stock from the vendor tree.
+# never calls, leaving everything on the hard crisp set; 0.60 tames the rough
+# edge (tuned by feel on-device). These copies precede the vendor-tree inherit
+# so they win; the other ~66 effect bins still ship stock from the vendor tree.
 PRODUCT_COPY_FILES += \
     $(LOCAL_PATH)/configs/vibrator/def/effect_0.bin:$(TARGET_COPY_OUT_ODM)/etc/vibrator/9999/def/effect_0.bin \
     $(LOCAL_PATH)/configs/vibrator/def/effect_1.bin:$(TARGET_COPY_OUT_ODM)/etc/vibrator/9999/def/effect_1.bin \
