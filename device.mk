@@ -95,16 +95,20 @@ PRODUCT_PACKAGES += \
 
 PRODUCT_COPY_FILES += \
     $(LOCAL_PATH)/configs/vibrator/excluded-input-devices.xml:$(TARGET_COPY_OUT_VENDOR)/etc/excluded-input-devices.xml
-# Source RichTap HAL (hardware/oplus) drives the stock libaacvibrator engine
-# and remaps AOSP effect ids to RichTap's internal prebaked ids, so IVibrator
-# perform() plays the real stock waveforms instead of a generic fallback.
-# TARGET_USES_OPLUS_VIBRATOR_BLOBS keeps the source-built QTI HAL out of the
-# build; the richtap HAL serves IVibrator instead (blob service dropped in the
-# vendor tree, its libaacvibrator/effect libs are kept for the HAL to link).
-TARGET_USES_OPLUS_VIBRATOR_BLOBS := true
+
+# sm8750-common QTI HAL with a dodge haptic-profile effect lib. Profiles are
+# selected at runtime via persist.sys.haptic_profile (Settings picker):
+#   richtap | crisp | gentle | op13def | op13soft (default)
+# op13def/op13soft are dodge's stock def/soft waveforms; get_effect_stream
+# reprofiles every prebaked effect AND composed primitive, so all haptic
+# sources (fingerprint, keyboard, gestures, notifications, ...) follow it.
+$(call soong_config_set,qti_vibrator,effect_lib,libqtivibratoreffect.oplus.dodge)
 
 PRODUCT_PACKAGES += \
-    android.hardware.vibrator.service.oplus-richtap
+    libqtivibratoreffect.oplus.dodge
+
+PRODUCT_PRODUCT_PROPERTIES += \
+    persist.sys.haptic_profile=op13soft
 
 # Inherit from the common OEM chipset makefile.
 $(call inherit-product, device/oneplus/sm8750-common/common.mk)
