@@ -98,20 +98,17 @@ PRODUCT_COPY_FILES += \
 $(call soong_config_set_bool,OPLUS_LINEAGE_TOUCH_HAL,ENABLE_GM,true)
 $(call soong_config_set_bool,OPLUS_LINEAGE_TOUCH_HAL,ENABLE_HTPR,false)
 
-# Vibrator
-# sm8750-common QTI HAL with a dodge haptic-profile effect lib. Profiles are
-# selected at runtime via persist.sys.haptic_profile (Settings picker):
-#   richtap | crisp | gentle | op13def | op13soft (default)
-# op13def/op13soft are dodge's stock def/soft waveforms; get_effect_stream
-# reprofiles every prebaked effect AND composed primitive, so all haptic
-# sources (fingerprint, keyboard, gestures, notifications, ...) follow it.
+# Vibrator (YAAP sm8650-common style profiles)
+# sm8750-common QTI HAL + dodge effect lib. Profiles via persist.sys.haptic_profile:
+#   richtap | crisp | gentle | op13crisp | op13gentle (default)
+# op13crisp/op13gentle = dodge stock def/soft effect_0..5 (AOSP IDs 0-5).
 $(call soong_config_set,qti_vibrator,effect_lib,libqtivibratoreffect.oplus.dodge)
 
 PRODUCT_PACKAGES += \
     libqtivibratoreffect.oplus.dodge
 
 PRODUCT_PRODUCT_PROPERTIES += \
-    persist.sys.haptic_profile=op13soft
+    persist.sys.haptic_profile=op13gentle
 
 # Inherit from the common OEM chipset makefile.
 $(call inherit-product, device/oneplus/sm8750-common/common.mk)
