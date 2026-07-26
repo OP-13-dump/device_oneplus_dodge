@@ -1,0 +1,17 @@
+//
+// SPDX-FileCopyrightText: The LineageOS Project
+// SPDX-License-Identifier: Apache-2.0
+//
+
+cc_library_shared {
+    name: "libqtivibratoreffect.oplus.dodge",
+    srcs: ["effect.cpp"],
+    local_include_dirs: ["."],
+    shared_libs: [
+        "libbase",
+        "libcutils",
+        "libutils",
+    ],
+    export_include_dirs: ["."],
+    vendor: true,
+}
