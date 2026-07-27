@@ -24,6 +24,7 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.res.Resources;
 import android.os.Bundle;
+import android.os.SystemProperties;
 import android.os.UserHandle;
 import android.text.TextUtils;
 import android.util.Log;
@@ -72,6 +73,7 @@ public class DeviceSettings extends SettingsBasePreferenceFragment
     private SwitchPreferenceCompat mOnePulsePWMSwitch;
     private SwitchPreferenceCompat mHbmSwitch;
     private SwitchPreferenceCompat mSunlightBoostSwitch;
+    private ListPreference mHapticProfilePref;
 
     private HbmController mHbmController;
     private PwmController mPwmController;
@@ -114,6 +116,14 @@ public class DeviceSettings extends SettingsBasePreferenceFragment
         syncHbmPwmState();
 
         initNotificationSliderPreference();
+
+        mHapticProfilePref = (ListPreference) findPreference(Constants.KEY_HAPTIC_PROFILE);
+        if (mHapticProfilePref != null) {
+            String currentProfile = SystemProperties.get(Constants.PROP_HAPTIC_PROFILE, Constants.HAPTIC_PROFILE_DEFAULT);
+            mHapticProfilePref.setValue(currentProfile);
+            mHapticProfilePref.setSummary(mHapticProfilePref.getEntry());
+            mHapticProfilePref.setOnPreferenceChangeListener(this);
+        }
     }
 
     @Override
@@ -259,6 +269,15 @@ public class DeviceSettings extends SettingsBasePreferenceFragment
                 return notifySliderActionChange(1, (String) newValue);
             case Constants.KEY_NOTIF_SLIDER_ACTION_BOTTOM:
                 return notifySliderActionChange(2, (String) newValue);
+            case Constants.KEY_HAPTIC_PROFILE:
+                String profileValue = (String) newValue;
+                SystemProperties.set(Constants.PROP_HAPTIC_PROFILE, profileValue);
+                ListPreference hapticPref = (ListPreference) preference;
+                int index = hapticPref.findIndexOfValue(profileValue);
+                if (index >= 0) {
+                    hapticPref.setSummary(hapticPref.getEntries()[index]);
+                }
+                return true;
             default:
                 break;
         }
