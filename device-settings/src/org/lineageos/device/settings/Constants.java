@@ -149,4 +149,9 @@ public class Constants {
     public static final String KEY_REFRESH_RATE_APPS = "refresh_rate_apps";
     /** 0 = auto: leave the system refresh rate settings untouched */
     public static final int REFRESH_RATE_DEFAULT = 0;
+
+    /* Haptic profile */
+    public static final String KEY_HAPTIC_PROFILE = "haptic_profile";
+    public static final String PROP_HAPTIC_PROFILE = "persist.sys.haptic_profile";
+    public static final String HAPTIC_PROFILE_DEFAULT = "op13gentle";
 }
