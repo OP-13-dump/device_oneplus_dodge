@@ -116,10 +116,12 @@ $(call inherit-product, device/oneplus/sm8750-common/common.mk)
 # Inherit from the proprietary files makefile.
 $(call inherit-product, vendor/oneplus/dodge/dodge-vendor.mk)
 
-# Real-time 1080p120: override stock odm camera feature/config blobs
+# Real-time 1080p120: override stock odm camera feature/config blobs.
+# filter-out must match the full PRODUCT_COPY_FILES entry (src:dest); matching
+# only %/odm/... fails because entries are src:$(TARGET_COPY_OUT_ODM)/etc/...
 PRODUCT_COPY_FILES := $(filter-out \
-    %/odm/etc/camera/config/oplus_camera_config \
-    %/odm/etc/camera/config/camera_unit_feature_config.protobuf \
+    %:$(TARGET_COPY_OUT_ODM)/etc/camera/config/oplus_camera_config \
+    %:$(TARGET_COPY_OUT_ODM)/etc/camera/config/camera_unit_feature_config.protobuf \
     ,$(PRODUCT_COPY_FILES))
 PRODUCT_COPY_FILES += \
     $(LOCAL_PATH)/camera/oplus_camera_config:$(TARGET_COPY_OUT_ODM)/etc/camera/config/oplus_camera_config \
