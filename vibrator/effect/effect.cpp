@@ -3,9 +3,11 @@
  * SPDX-License-Identifier: Apache-2.0
  *
  * dodge (OnePlus 13) haptic profile selector — YAAP sm8650-common style.
- * Tables are keyed with AOSP Effect IDs 0-5. Profiles:
+ * Prebaked tables are keyed with AOSP Effect IDs 0-5, primitive tables with the
+ * AOSP CompositePrimitive ids under PRIMITIVE_ID_MASK. Profiles:
  *   richtap | crisp | gentle | op13crisp | op13gentle (default)
- * op13crisp/op13gentle are dodge stock def/soft waveforms (effect_0..5).
+ * op13crisp/op13gentle are dodge stock ColorOS waveforms — def/soft effect_0..5
+ * for the prebaked effects, and def-derived cuts for the primitives.
  */
 
 #include "effect.h"
@@ -20,6 +22,7 @@
 #include "op13_stock_effects.h"
 #include "primitive_effect.h"
 #include "generated_primitive_profiles.h"
+#include "op13_primitive_profiles.h"
 
 const struct effect_stream* get_effect_stream(uint32_t effect_id) {
     using android::base::GetProperty;
@@ -32,12 +35,21 @@ const struct effect_stream* get_effect_stream(uint32_t effect_id) {
         const struct effect_stream* selected = primitives;
         size_t size = ARRAY_SIZE(primitives);
 
-        /* YAAP: gentle + op13gentle share the softened primitive set. */
-        if (profile == "crisp" || profile == "op13crisp") {
+        /* The op13 profiles get stock ColorOS primitives of their own. They used
+         * to borrow the YAAP sets, which peak at 78/127 on gentle — that is why
+         * "OnePlus 13 Gentle" felt weak: primitives are about half of all haptic
+         * callbacks (keyboard and UI taps compose them; only the six predefined
+         * effects go through perform()). */
+        if (profile == "op13crisp") {
+            selected = primitives_op13crisp;
+            size = ARRAY_SIZE(primitives_op13crisp);
+        } else if (profile == "op13gentle" || profile == "op13soft") {
+            selected = primitives_op13gentle;
+            size = ARRAY_SIZE(primitives_op13gentle);
+        } else if (profile == "crisp") {
             selected = primitives_crisp;
             size = ARRAY_SIZE(primitives_crisp);
-        } else if (profile == "gentle" || profile == "op13gentle" ||
-                   profile == "op13soft") {
+        } else if (profile == "gentle") {
             selected = primitives_gentle;
             size = ARRAY_SIZE(primitives_gentle);
         }
