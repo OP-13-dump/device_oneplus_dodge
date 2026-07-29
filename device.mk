@@ -113,20 +113,18 @@ PRODUCT_PRODUCT_PROPERTIES += \
 # Inherit from the common OEM chipset makefile.
 $(call inherit-product, device/oneplus/sm8750-common/common.mk)
 
-# Inherit from the proprietary files makefile.
-$(call inherit-product, vendor/oneplus/dodge/dodge-vendor.mk)
-
-# Real-time 1080p120: override stock odm camera feature/config blobs.
-# filter-out must match the full PRODUCT_COPY_FILES entry (src:dest); matching
-# only %/odm/... fails because entries are src:$(TARGET_COPY_OUT_ODM)/etc/...
-PRODUCT_COPY_FILES := $(filter-out \
-    %:$(TARGET_COPY_OUT_ODM)/etc/camera/config/oplus_camera_config \
-    %:$(TARGET_COPY_OUT_ODM)/etc/camera/config/camera_unit_feature_config.protobuf \
-    ,$(PRODUCT_COPY_FILES))
+# Real-time 1080p120: override the stock odm camera feature/config blobs.
+# These have to be declared *before* inheriting dodge-vendor.mk. inherit-product
+# only appends an @inherit: marker that gets expanded after this file is parsed,
+# so a filter-out here never sees (let alone removes) the vendor entries.
+# Duplicate PRODUCT_COPY_FILES destinations are resolved first-one-wins, so
+# listing ours ahead of the inherit is what actually makes the override stick.
 PRODUCT_COPY_FILES += \
     $(LOCAL_PATH)/camera/oplus_camera_config:$(TARGET_COPY_OUT_ODM)/etc/camera/config/oplus_camera_config \
     $(LOCAL_PATH)/camera/camera_unit_feature_config.protobuf:$(TARGET_COPY_OUT_ODM)/etc/camera/config/camera_unit_feature_config.protobuf
 
+# Inherit from the proprietary files makefile.
+$(call inherit-product, vendor/oneplus/dodge/dodge-vendor.mk)
 
 # Camera
 $(call inherit-product-if-exists, vendor/oplus/camera/opluscamera.mk)
