@@ -4,6 +4,10 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
+import json
+
+from Crypto.Cipher import AES
+
 from extract_utils.fixups_blob import (
     blob_fixup,
     blob_fixups_user_type,
@@ -25,6 +29,95 @@ namespace_imports = [
     # defined in the device/oneplus/dodge namespace -- import it so the blob can resolve it.
     'device/oneplus/dodge',
 ]
+
+# Oplus camera config decryption & patching
+KEY = bytes.fromhex("6f2170406c247525535e4326412a4d28")
+MAGIC = b"\x01\x01"
+HEADER_LEN = 4
+FOOTER_LEN = 4
+
+def decrypt_oplus_config(blob: bytes) -> bytes:
+    """Decrypt an encrypted Oplus camera config blob (must start with 01 01)."""
+    ct = blob[HEADER_LEN:len(blob) - FOOTER_LEN]
+    pt = AES.new(KEY, AES.MODE_ECB).decrypt(ct)
+    pad_len = pt[-1]
+    if 1 <= pad_len <= 16:
+        pt = pt[:-pad_len]
+    return pt
+
+def get_plain_config_bytes(file_path: str) -> bytes:
+    """
+    Read the config file from disk. If it starts with the encryption magic,
+    decrypt it; otherwise return the raw bytes (already plaintext).
+    """
+    with open(file_path, 'rb') as f:
+        raw = f.read()
+    if raw[:2] == MAGIC:
+        return decrypt_oplus_config(raw)
+    return raw
+
+def update_vendor_tag(ctx, file, file_path, vendor_tag, new_value, type_str="Byte", count="1"):
+    """
+    Generic helper: get plaintext config, find or add a vendor tag, set its Value,
+    and write back as plaintext JSON.
+    """
+    plain_bytes = get_plain_config_bytes(file_path)
+    config = json.loads(plain_bytes.decode('utf-8'))
+
+    found = False
+    for entry in config:
+        if entry.get("VendorTag") == vendor_tag:
+            entry["Value"] = new_value
+            entry["Type"] = type_str
+            entry["Count"] = count
+            found = True
+            break
+
+    if not found:
+        config.append({
+            "VendorTag": vendor_tag,
+            "Type": type_str,
+            "Count": count,
+            "Value": new_value
+        })
+
+    with open(file_path, 'w') as f:
+        json.dump(config, f, indent=2, separators=(',', ': '))
+
+# Disable "Liquid Glass" design
+def set_cross_window_blur_zero(ctx, file, file_path, *args, **kwargs):
+    update_vendor_tag(ctx, file, file_path, "com.oplus.camera.support.cross.window.blur", "0")
+
+# Unlock 120fps
+def set_120fps_guide_support(ctx, file, file_path, *args, **kwargs):
+    update_vendor_tag(ctx, file, file_path, "com.oplus.feature.120fps.guide.support", "1")
+
+def set_slowvideo_wide_120fps_not_support(ctx, file, file_path, *args, **kwargs):
+    update_vendor_tag(ctx, file, file_path, "com.oplus.feature.slowvideo.wide.120fps.not.support", "1")
+
+def set_video_1080p_120fps_support(ctx, file, file_path, *args, **kwargs):
+    update_vendor_tag(ctx, file, file_path, "com.oplus.feature.video.1080p.120fps.support", "1")
+
+def set_video_1080p_120fps_zoom_range(ctx, file, file_path, *args, **kwargs):
+    update_vendor_tag(ctx, file, file_path, "com.oplus.feature.video.1080p.120fps.zoom.range", "1,20", "Float", "2")
+
+def set_video_1080p120fps_max_zoom_list(ctx, file, file_path, *args, **kwargs):
+    update_vendor_tag(ctx, file, file_path, "com.oplus.feature.video.1080p120fps.max.zoom.list", "4,6,18", "Float", "3")
+
+def set_video_120fps_camera_main_only_support(ctx, file, file_path, *args, **kwargs):
+    update_vendor_tag(ctx, file, file_path, "com.oplus.feature.video.120fps.camera.main.only.support", "0")
+
+def set_video_4k_120fps_support(ctx, file, file_path, *args, **kwargs):
+    update_vendor_tag(ctx, file, file_path, "com.oplus.feature.video.4k.120fps.support", "1")
+
+def set_video_4k_120fps_zoom_range(ctx, file, file_path, *args, **kwargs):
+    update_vendor_tag(ctx, file, file_path, "com.oplus.feature.video.4k.120fps.zoom.range", "1,20", "Float", "2")
+
+def set_video_4k120fps_max_zoom_list(ctx, file, file_path, *args, **kwargs):
+    update_vendor_tag(ctx, file, file_path, "com.oplus.feature.video.4k120fps.max.zoom.list", "4,6,18", "Float", "3")
+
+def set_video_dv_120fps_support(ctx, file, file_path, *args, **kwargs):
+    update_vendor_tag(ctx, file, file_path, "com.oplus.feature.video.dv.120fps.support", "1")
 
 blob_fixups: blob_fixups_user_type = {
     'odm/etc/init/init.camera_process.rc': blob_fixup()
@@ -133,6 +226,18 @@ blob_fixups: blob_fixups_user_type = {
     'odm/etc/camera/CameraHWConfiguration.config': blob_fixup()
         .regex_replace('enableSWfdForThirdCamUnit   = FALSE', 'enableSWfdForThirdCamUnit   = TRUE')
         .regex_replace('fdSupport                 = FALSE;', 'fdSupport                 = TRUE;'),
+    'odm/etc/camera/config/oplus_camera_config': blob_fixup()
+        .call(set_cross_window_blur_zero)
+        .call(set_120fps_guide_support)
+        .call(set_slowvideo_wide_120fps_not_support)
+        .call(set_video_1080p_120fps_support)
+        .call(set_video_1080p_120fps_zoom_range)
+        .call(set_video_1080p120fps_max_zoom_list)
+        .call(set_video_120fps_camera_main_only_support)
+        .call(set_video_4k_120fps_support)
+        .call(set_video_4k_120fps_zoom_range)
+        .call(set_video_4k120fps_max_zoom_list)
+        .call(set_video_dv_120fps_support),
 }  # fmt: skip
 
 module = ExtractUtilsModule(
