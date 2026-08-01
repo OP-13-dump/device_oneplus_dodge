@@ -21,6 +21,7 @@ TARGET_USE_FILES := false
 TARGET_USE_GPHOTOS := true
 BYPASS_CHARGE_SUPPORTED := true
 WITH_GMS := true
+WITH_BCR := true
 
 PRODUCT_NAME := lineage_dodge
 PRODUCT_DEVICE := dodge
