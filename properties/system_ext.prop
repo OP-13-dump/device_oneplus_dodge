@@ -1,2 +1,20 @@
 # IFAA
 sys.oplus.ifaa.model=ONEPLUS-R23821
+
+# AIUnit region.
+#
+# AIUnit resolves its region from persist.sys.oplus.region, falling back to
+# ro.vendor.oplus.regionmark. Stock only sets the regionmark for EU (EUEX) and
+# CN devices -- 23893/build.NA.prop carries none -- so on everything else the
+# lookup comes back empty and AIUnit assumes EUEX. Oplus's config then reports
+# the Gallery AI units as disabled, and the editor entries stay dark no matter
+# what is installed locally.
+#
+# US is the correct default here because it matches the units we bundle: the
+# preinstalled plugins are the -us- variants, and asking for another region
+# makes AIUnit look for a variant of each unit that is not shipped.
+#
+# This is only a default. persist properties are overridden by /data/property,
+# so it can be changed per device and survives reboots:
+#     setprop persist.sys.oplus.region <REGION>
+persist.sys.oplus.region=US
