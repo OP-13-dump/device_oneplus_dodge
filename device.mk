@@ -110,6 +110,27 @@ PRODUCT_PACKAGES += \
 PRODUCT_PRODUCT_PROPERTIES += \
     persist.sys.haptic_profile=op13gentle
 
+# ProXDR / HDR photo pipeline.
+#
+# Read off stock CPH2653 16.0.9.402 with getprop; all four are absent here, which
+# is why Gallery's ultra_hdr / local_hdr / hdr_vision_brighten / edr_listener
+# feature checks stay false and photos render SDR even though the panel reports
+# ro.surface_flinger.has_HDR_display=true.
+#
+# Note the panel advertises supportedHdrTypes=INVALID even on stock, so ProXDR
+# does not ride the standard Android HDR types -- it is Oplus's own localhdr/uhdr
+# path, gated purely on these props.
+#
+# Dolby Vision is deliberately NOT enabled here (stock also sets
+# persist.sys.feature.dolby_vision{,_app} and ro.vendor.oplus.dolby_vision_dpu{,.dvs}).
+# Dolby on this device is a separate, flash-verified port that lives on its own
+# branch; turning the UI on without that backend just offers a broken toggle.
+PRODUCT_PRODUCT_PROPERTIES += \
+    persist.sys.feature.hdr_vision_app=1 \
+    persist.sys.feature.localhdr_version=2 \
+    persist.sys.feature.uhdr.support=true \
+    persist.sys.feature.support.edrlistener=true
+
 # Inherit from the common OEM chipset makefile.
 $(call inherit-product, device/oneplus/sm8750-common/common.mk)
 

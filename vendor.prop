@@ -26,3 +26,7 @@ vendor.usb.product_string=OnePlus 13
 # Camera
 ro.vendor.oplus.market.enname=OnePlus 13
 ro.vendor.oplus.market.name=OnePlus 13
+
+# ProXDR: Oplus uniform HDR pipeline (stock CPH2653 16.0.9 sets this).
+# Pairs with the persist.sys.feature.* HDR props in device.mk.
+ro.vendor.oplus.hdr.uniform=1
