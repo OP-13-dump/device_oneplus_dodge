@@ -1,9 +1,28 @@
 ro.product.odm.model=CPH2655
 ro.product.odm.name=CPH2655
+
+# Everything below applies only to NA units. init reaches this file through
+#     import /odm/etc/${ro.boot.prjname}/build.${ro.boot.hardware.revision}.prop
+# in build.default.prop, and ro.boot.hardware.revision is burned in per unit, so
+# an Indian device reads build.IN.prop and a European one build.EU.prop instead.
+
 # Stock ships a regionmark for EU/CN/IN but not for NA, so NA units fall back to
-# EUEX. AIUnit's own region resolution is already pinned by
-# persist.sys.oplus.region=US in system_ext.prop, but the Odin cloud endpoints
-# read this separately as the trackRegion request header, and an empty value gets
-# the AI inference call rejected with 3000404. ROW is what the NA retail units
-# report. Previously set at runtime by a KernelSU service script.
+# EUEX. The Odin cloud endpoints read this as the trackRegion request header, and
+# an empty value gets the AI inference call rejected with 3000404. ROW is what the
+# NA retail units report. Previously set at runtime by a KernelSU service script.
 ro.vendor.oplus.regionmark=ROW
+
+# AIUnit resolves its region from persist.sys.oplus.region first and falls back
+# to the regionmark above. US is set only for NA because it is the only value
+# confirmed on device -- with it, the Gallery units come back
+# sourceRegion:US isSupport:true, and without it they were reported disabled.
+#
+# Not set for EU or IN on purpose. The token AIUnit expects for those is not
+# known, and a wrong one is worse than none: it would make AIUnit look for a
+# regional variant of each unit that is not shipped, disabling AI on exactly the
+# devices this is meant to help. Leaving it unset lets the regionmark fallback
+# pick EUEX or IN, which is what stock does.
+#
+# Still only a default -- /data/property wins, so it survives:
+#     setprop persist.sys.oplus.region <REGION>
+persist.sys.oplus.region=US
