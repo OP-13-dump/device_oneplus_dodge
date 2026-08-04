@@ -1,1 +1,30 @@
 /odm/bin/hw/vendor\.oplus\.hardware\.vibrator-service    u:object_r:hal_vibrator_default_exec:s0
+
+# AIUnit's OAA plugins link against libaiboost at load time -- lib<unitId>.so
+# names it in DT_NEEDED -- so this is not the optional scheduling hint the name
+# suggests:
+#
+#   dlopen failed: library "libaiboost.so" not found: needed by
+#     /data/data/com.oplus.aiunit/files/OAA/17834040/3002/lib17834040.so
+#   oaa create failed. error [83]
+#
+# and it carries into Gallery, which then loses convertImageToVector and the OCR
+# embedding engine -- media scanning stops.
+#
+# Stock's vendor_file_contexts labels the rest of the family (libaiboost_te,
+# libaiboost_sydet, libaiboost_qnn_external_delegate_te) same_process_hal_file
+# but misses these two, so they fall through to vendor_file, which apps may
+# neither read nor execute.
+#
+# same_process_hal_file is the correct label here, not a workaround: both are
+# dlopen()ed into the app's own process, both are declared in
+# /vendor/etc/public.libraries.txt, and appdomain already holds the access --
+#   system/sepolicy/private/app.te:
+#     allow appdomain same_process_hal_file:file { execute read open getattr map };
+# -- so no new allow rule is needed. It is also the only route that does not hit
+# the neverallows in domain.te:1254 and :2155, both of which exempt
+# same_process_hal_file. Granting platform_app vendor_file instead fails the
+# build, and system_executes_vendor_violators would hand every platform-signed
+# app read and execute across all of /vendor.
+/(vendor|odm)/lib(64)?/libaiboost\.so    u:object_r:same_process_hal_file:s0
+/(vendor|odm)/lib(64)?/libaiboost_llm\.so    u:object_r:same_process_hal_file:s0
