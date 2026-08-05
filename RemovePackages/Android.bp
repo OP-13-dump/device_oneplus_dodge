@@ -2,6 +2,7 @@ cc_prebuilt_binary {
      name: "RemovePackagesDodge",
      overrides: [
         "AmbientSensePrebuilt",
+	"Aperture",
  	"arcore",
  	"Chrome",
  	"Chrome-Stub",
@@ -21,7 +22,8 @@ cc_prebuilt_binary {
 	"SafetyHubSuwPrebuilt",
 	"Matlog",
 	"Twelve",
-	"Jelly"
+	"Jelly",
+	"VideoGallery"
      ],
      strip: {
          none: true,
