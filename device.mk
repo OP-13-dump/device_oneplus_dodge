@@ -134,14 +134,19 @@ PRODUCT_PRODUCT_PROPERTIES += \
 # Inherit from the common OEM chipset makefile.
 $(call inherit-product, device/oneplus/sm8750-common/common.mk)
 
-# Real-time 1080p120: override the stock odm camera feature/config blobs.
-# These have to be declared *before* inheriting dodge-vendor.mk. inherit-product
+# Real-time 1080p120: override the stock odm camera feature blob.
+# This has to be declared *before* inheriting dodge-vendor.mk. inherit-product
 # only appends an @inherit: marker that gets expanded after this file is parsed,
 # so a filter-out here never sees (let alone removes) the vendor entries.
 # Duplicate PRODUCT_COPY_FILES destinations are resolved first-one-wins, so
 # listing ours ahead of the inherit is what actually makes the override stick.
+#
+# oplus_camera_config is deliberately NOT copied here any more. extract-files.py
+# now decrypts it and sets the 120fps vendor tags directly on the vendor blob,
+# and because this list wins first-one-wins, a static copy here would silently
+# override those values with the older, narrower ones (main.only.support=1,
+# zoom.range 1,3.5, max.zoom.list 1,2.9,10) and undo the patch.
 PRODUCT_COPY_FILES += \
-    $(LOCAL_PATH)/camera/oplus_camera_config:$(TARGET_COPY_OUT_ODM)/etc/camera/config/oplus_camera_config \
     $(LOCAL_PATH)/camera/camera_unit_feature_config.protobuf:$(TARGET_COPY_OUT_ODM)/etc/camera/config/camera_unit_feature_config.protobuf
 
 # Inherit from the proprietary files makefile.
