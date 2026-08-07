@@ -1,2 +1,4 @@
 # Allow power hal to access /sys/proc/walt sysnodes
-allow hal_power_default proc:file { write open getattr };
+al_client_domain(hal_power_default, hal_thermal)
+
+allow hal_power_default self:capability sys_nice;
