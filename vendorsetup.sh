@@ -1,14 +1,23 @@
+# Clone Devices specific repos
 git clone -b 16.2 https://github.com/OP-13-dump/device_oneplus_sm8750-common device/oneplus/sm8750-common
 git clone -b 16.2 https://github.com/OP-13-dump/vendor_oneplus_dodge vendor/oneplus/dodge
 git clone -b 16.2 https://github.com/OP-13-dump/vendor_oneplus_sm8750-common vendor/oneplus/sm8750-common
 git clone -b 16.2 https://github.com/OP-13-dump/kernel_oneplus_sm8750 kernel/oneplus/sm8750 --depth=1
 git clone -b 16.2 https://github.com/OP-13-dump/kernel_oneplus_sm8750-modules kernel/oneplus/sm8750-modules
 git clone -b 16.2 https://github.com/OP-13-dump/kernel_oneplus_sm8750-devicetrees kernel/oneplus/sm8750-devicetrees
+git clone -b 16.2 https://gitlab.com/osm1019/vendor_oplus_fusionlight.git vendor/oplus/fusionlight
 git clone -b 16.2 https://github.com/OP-13-dump/vendor_oneplus_ir vendor/oneplus/ir
+
+# Sign keys
 git clone -b 16.2 https://github.com/Lunaris-AOSP/vendor_lunaris-priv_keys.git vendor/lunaris-priv/keys
+
+# Dolby
 git clone -b dolby https://gitlab.com/osm1019/proprietary_vendor_oneplus_dolby.git vendor/oneplus/dolby
 git clone -b dolby https://github.com/osm1019/packages_apps_LunarisDolby packages/apps/LunarisDolby
-git clone -b 16.2 https://gitlab.com/osm1019/vendor_oplus_fusionlight.git vendor/oplus/fusionlight
+
+# Forked Audio & Diplay hals
+rm -rf hardware/qcom-caf/sm8750/audio/primary-hal ; git clone https://github.com/OP-13-dump/android_hardware_qcom_audio-ar.git -b lineage-23.2-caf-sm8750 hardware/qcom-caf/sm8750/audio/primary-hal
+rm -rf hardware/qcom-caf/sm8750/display/core ; git clone https://github.com/OP-13-dump/android_vendor_qcom_opensource_display-core.git -b lineage-23.2-caf-sm8750 hardware/qcom-caf/sm8750/display/core
 
 echo ""
 echo "Select option for dodge tree:"
