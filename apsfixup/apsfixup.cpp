@@ -203,26 +203,67 @@ static void wrap_p010(uint16_t* dst, uint16_t* src, uint32_t w2, uint32_t w3, ui
     g_real_p010(dst, src, w2, w3, w4, w5);
 }
 
+// Refuse to touch a slot that is not mapped, or that does not already hold what we expect.
+// Offsets are pinned to blob builds; after a firmware bump a stale offset otherwise makes
+// got_redirect() write to an unrelated address, which SIGSEGVs cameraserver inside
+// libAlgoProcess's static ctor and takes the whole camera down. Failing quietly is correct:
+// worst case the APS turbo path is uncorrected again, which is a colour bug, not a dead camera.
+static bool got_slot_ok(uint64_t slot, void* expect, void** cur) {
+    uint64_t mb, ms;
+    if (!range_of(slot, &mb, &ms) || slot + sizeof(void*) > mb + ms) {
+        LOGW("GOT slot %p not mapped -- refusing to hook (blob drift?)", (void*)slot);
+        return false;
+    }
+    void* v = *(void**)slot;
+    if (cur) *cur = v;
+    if (expect && v != expect) {
+        LOGW("GOT slot %p holds %p, expected %p -- refusing to hook (blob drift?)", (void*)slot, v, expect);
+        return false;
+    }
+    return true;
+}
+
+// Do the two addresses live in the same mapping?
+static bool same_module(uint64_t a, uint64_t b) {
+    uint64_t ab, as_, bb, bs;
+    return range_of(a, &ab, &as_) && range_of(b, &bb, &bs) && ab == bb;
+}
+
 // ---- install ----
 static bool g_p010_done = false, g_dlsym_done = false;
+static bool g_p010_skipped = false, g_dlsym_skipped = false;
 static void try_install() {
     uint64_t base;
     if (!g_p010_done && module_base("libAlgoProcess.so", &base)) {
-        void* old = nullptr;
-        if (got_redirect(base + P010_GOT_OFF, (void*)wrap_p010, &old)) {
-            g_real_p010 = (p010_t)old;
-            void* expect = (void*)(base + P010_FUNC_OFF);
-            if (old != expect) LOGW("GOT[p010]=%p expected %p (blob drift?)", old, expect);
-            LOGI("GOT-hooked p010 (real=%p)", old);
-            g_p010_done = true;
+        uint64_t slot = base + P010_GOT_OFF;
+        void* expect  = (void*)(base + P010_FUNC_OFF);
+        if (!got_slot_ok(slot, expect, nullptr)) {
+            g_p010_skipped = true; g_p010_done = true;      // stop retrying a bad offset
+        } else {
+            void* old = nullptr;
+            if (got_redirect(slot, (void*)wrap_p010, &old)) {
+                g_real_p010 = (p010_t)old;
+                LOGI("GOT-hooked p010 (real=%p)", old);
+                g_p010_done = true;
+            }
         }
     }
     if (!g_dlsym_done && module_base("libAlgoInterface.so", &base)) {
-        void* old = nullptr;
-        if (got_redirect(base + DLSYM_GOT_OFF, (void*)wrap_dlsym, &old)) {
-            g_real_dlsym = (dlsym_t)old;
-            LOGI("GOT-hooked dlsym in libAlgoInterface (real=%p)", old);
-            g_dlsym_done = true;
+        uint64_t slot = base + DLSYM_GOT_OFF;
+        void* cur = nullptr;
+        // dlsym lives in libdl, so we cannot pin an exact address here; require that the slot
+        // at least already points at the same mapping our own dlsym import resolves to.
+        if (!got_slot_ok(slot, nullptr, &cur) ||
+            !same_module((uint64_t)cur, (uint64_t)(void*)dlsym)) {
+            LOGW("GOT[dlsym]=%p is not in libdl -- refusing to hook (blob drift?)", cur);
+            g_dlsym_skipped = true; g_dlsym_done = true;
+        } else {
+            void* old = nullptr;
+            if (got_redirect(slot, (void*)wrap_dlsym, &old)) {
+                g_real_dlsym = (dlsym_t)old;
+                LOGI("GOT-hooked dlsym in libAlgoInterface (real=%p)", old);
+                g_dlsym_done = true;
+            }
         }
     }
 }
@@ -230,7 +271,10 @@ static void* poller(void*) {
     // 25ms cadence; dlsym(ARC) happens at the first turbo capture (seconds after libAlgoInterface
     // loads), so this hooks well before it. ~10 min total budget.
     for (int i = 0; i < 24000 && !(g_p010_done && g_dlsym_done); i++) { try_install(); usleep(25 * 1000); }
-    if (!(g_p010_done && g_dlsym_done)) LOGW("install incomplete: p010=%d dlsym=%d", g_p010_done, g_dlsym_done);
+    if (g_p010_skipped || g_dlsym_skipped)
+        LOGW("APS fixup INACTIVE (p010_skipped=%d dlsym_skipped=%d) -- offsets need re-deriving "
+             "against these blobs; expect the old turbo colour bug", g_p010_skipped, g_dlsym_skipped);
+    else if (!(g_p010_done && g_dlsym_done)) LOGW("install incomplete: p010=%d dlsym=%d", g_p010_done, g_dlsym_done);
     return nullptr;
 }
 
