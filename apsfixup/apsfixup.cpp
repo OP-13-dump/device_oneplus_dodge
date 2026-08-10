@@ -18,8 +18,15 @@
 //
 // Loaded into com.oplus.camera as a DT_NEEDED of /odm/lib64/libAlgoProcess.so. Offsets are
 // pinned to the dodge blobs:
-//   libAlgoProcess.so    BuildId db5afd2a..  p010LSB2MSBNeon @ +0x4bd934, its GOT slot @ +0x62db58
-//   libAlgoInterface.so  BuildId a81b2d71..  dlsym GOT slot @ +0x23c8c58
+//   libAlgoProcess.so    BuildId 1052562f..  p010LSB2MSBNeon @ +0x4bf6a0, its GOT slot @ +0x631b68
+//   libAlgoInterface.so  BuildId ba24891f..  dlsym GOT slot @ +0x23ccc58
+//
+// These move with every firmware bump. Re-derive with:
+//   readelf -sW libAlgoProcess.so   | grep p010LSB2MSBNeon   -> P010_FUNC_OFF
+//   readelf -rW libAlgoProcess.so   | grep p010LSB2MSBNeon   -> P010_GOT_OFF
+//   readelf -rW libAlgoInterface.so | grep -w dlsym          -> DLSYM_GOT_OFF
+// Stale offsets make got_redirect() write to an unrelated address: cameraserver takes a
+// SIGSEGV inside libAlgoProcess's static ctor and the camera never opens.
 //
 #include <android/log.h>
 #include <dlfcn.h>
@@ -37,9 +44,9 @@
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, TAG, __VA_ARGS__)
 #define LOGW(...) __android_log_print(ANDROID_LOG_WARN, TAG, __VA_ARGS__)
 
-static const uintptr_t P010_FUNC_OFF = 0x4bd934;   // p010LSB2MSBNeon in libAlgoProcess
-static const uintptr_t P010_GOT_OFF  = 0x62db58;   // its JUMP_SLOT GOT entry
-static const uintptr_t DLSYM_GOT_OFF = 0x23c8c58;  // dlsym JUMP_SLOT GOT entry in libAlgoInterface
+static const uintptr_t P010_FUNC_OFF = 0x4bf6a0;   // p010LSB2MSBNeon in libAlgoProcess
+static const uintptr_t P010_GOT_OFF  = 0x631b68;   // its JUMP_SLOT GOT entry
+static const uintptr_t DLSYM_GOT_OFF = 0x23ccc58;  // dlsym JUMP_SLOT GOT entry in libAlgoInterface
 
 static inline bool is_buf(uint64_t v)     { uint32_t hi=(uint32_t)(v>>32); return hi>=0x70 && hi<=0x7f && (uint32_t)v >= 0x100000u; }
 static inline bool is_garbage(uint64_t v) { uint32_t hi=(uint32_t)(v>>32); return hi>=0x70 && hi<=0x7f && (uint32_t)v <  0x100000u; }
