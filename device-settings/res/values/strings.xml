@@ -257,6 +257,12 @@
     <string name="refresh_rate_overrides_title">Per-App Overrides</string>
     <string name="refresh_rate_app_title_dialog">Select Refresh Rate</string>
     <string name="no_app_overrides">No app-specific overrides configured</string>
+    <string name="ltpo_title">LTPO (adaptive refresh rate)</string>
+    <string name="ltpo_summary">Allow the panel to self-refresh at low rates (down to 1 Hz) when the screen is idle, saving power</string>
+    <string name="ltpo_tile_label">LTPO</string>
+    <string name="ltpo_tile_description">Toggle adaptive (LTPO) refresh rate</string>
+    <string name="ltpo_adaptive">Adaptive</string>
+    <string name="ltpo_fixed">Fixed</string>
     <string name="refresh_rate_auto">Auto</string>
     <string name="refresh_rate_60hz" translatable="false"> 60 Hz</string>
     <string name="refresh_rate_90hz" translatable="false"> 90 Hz</string>

@@ -18,6 +18,7 @@ import androidx.preference.ListPreference;
 import androidx.preference.Preference;
 import androidx.preference.PreferenceFragmentCompat;
 import androidx.preference.PreferenceGroup;
+import androidx.preference.SwitchPreferenceCompat;
 
 import org.lineageos.device.settings.Constants;
 import org.lineageos.device.settings.R;
@@ -39,6 +40,7 @@ public class RefreshRateFragment extends PreferenceFragmentCompat {
     private AppListManager mAppListManager;
 
     private ListPreference mGlobalRefreshRate;
+    private SwitchPreferenceCompat mLtpoPref;
     private PreferenceGroup mAppsPreList;
     private Preference mAddAppsPref;
 
@@ -72,6 +74,17 @@ public class RefreshRateFragment extends PreferenceFragmentCompat {
                 }
             });
             updateSummary();
+        }
+
+        // LTPO master switch: dynamic panel self-refresh floor (1Hz idle) vs
+        // pinned to the mode rate. Written straight to the kernel min_fps node.
+        mLtpoPref = findPreference(Constants.KEY_LTPO_ENABLED);
+        if (mLtpoPref != null) {
+            mLtpoPref.setChecked(mController.isLtpoEnabled());
+            mLtpoPref.setOnPreferenceChangeListener((pref, newValue) -> {
+                mController.setLtpoEnabled((Boolean) newValue);
+                return true;
+            });
         }
 
         // Per-app override list
