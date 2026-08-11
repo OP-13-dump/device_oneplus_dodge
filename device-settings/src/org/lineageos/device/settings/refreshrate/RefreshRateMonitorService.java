@@ -176,9 +176,14 @@ public class RefreshRateMonitorService extends Service {
             return;
         }
 
-        // Fixed rates mean fixed all the way down: pin the panel self-refresh at
-        // the mode rate too; auto (0) re-enables dynamic LTPO (20Hz floor, 1Hz idle)
-        FileUtils.writeLine(Constants.NODE_ADFR_MIN_FPS, String.valueOf(fps));
+        // LTPO master switch (see KEY_LTPO_ENABLED): when enabled the panel
+        // self-refresh floor is dynamic (write 0 -> kernel maps to 1: 20Hz active
+        // floor, 1Hz idle); when disabled the panel is pinned to the panel max
+        // (120) so it never drops below the mode rate - the kernel clamps 120
+        // into whichever timing's mapping table is active, giving a fixed display.
+        boolean ltpo = mRefreshRateController.isLtpoEnabled();
+        int minFps = ltpo ? 0 : 120;
+        FileUtils.writeLine(Constants.NODE_ADFR_MIN_FPS, String.valueOf(minFps));
 
         // fps == 0 (auto): open SF to the full 60..120 range so it can pick the mode
         // by content. fps > 0 (fixed): lock SF to that single mode (MIN == PEAK).

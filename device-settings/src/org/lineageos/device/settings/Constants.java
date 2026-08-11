@@ -141,7 +141,19 @@ public class Constants {
      *  (kernel clamps into the current timing's table, so writing the tile
      *  rate pins the DDIC at the mode rate). Applied by the kernel
      *  immediately and re-applied on every panel enable/timing switch. */
-    public static final String NODE_ADFR_MIN_FPS = "/sys/kernel/oplus_display/adfr_min_fps";
+    public static final String NODE_ADFR_MIN_FPS = "/sys/kernel/oplus_display/min_fps";
+
+    /** LTPO (adaptive refresh) master switch: on = panel self-refresh floor is
+     *  dynamic (min_fps 0 -> kernel maps to 1: 20Hz active floor, 1Hz idle),
+     *  off = panel pinned to the mode rate (no idle drop). The kernel re-arms
+     *  sa_min_fps=1 on every screen-on/timing switch, so DeviceSettingsService
+     *  re-applies this state on ACTION_SCREEN_ON. */
+    public static final String KEY_LTPO_ENABLED = "ltpo_enabled";
+
+    /** Broadcast sent whenever the LTPO master switch changes, so the QS tile
+     *  (LtpoTile) and any other UI stays in sync. Package-scoped, same app. */
+    public static final String ACTION_LTPO_STATE_CHANGED =
+            "org.lineageos.device.settings.action.LTPO_STATE_CHANGED";
 
     /** Refresh rate */
     public static final String KEY_REFRESH_RATE_MODE = "refresh_rate_mode";

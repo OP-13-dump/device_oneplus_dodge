@@ -16,6 +16,13 @@
             android:entryValues="@array/refresh_rate_values"
             android:defaultValue="0" />
 
+        <SwitchPreferenceCompat
+            android:key="ltpo_enabled"
+            android:icon="@drawable/ic_ltpo"
+            android:title="@string/ltpo_title"
+            android:summary="@string/ltpo_summary"
+            android:defaultValue="true" />
+
     </PreferenceCategory>
 
     <PreferenceCategory

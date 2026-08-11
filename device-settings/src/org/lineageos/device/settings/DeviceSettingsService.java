@@ -188,6 +188,9 @@ public class DeviceSettingsService extends Service {
                     case Intent.ACTION_SCREEN_ON:
                         handleScreenOn();
                         break;
+                    case DisplayModeController.ACTION_DISPLAY_MODE_CHANGED:
+                        handleDisplayModeChanged();
+                        break;
                     case Intent.ACTION_POWER_CONNECTED:
                         handlePowerConnected();
                         break;
@@ -201,6 +204,7 @@ public class DeviceSettingsService extends Service {
         IntentFilter filter = new IntentFilter();
         filter.addAction(Intent.ACTION_SCREEN_OFF);
         filter.addAction(Intent.ACTION_SCREEN_ON);
+        filter.addAction(DisplayModeController.ACTION_DISPLAY_MODE_CHANGED);
         filter.addAction(Intent.ACTION_POWER_CONNECTED);
         filter.addAction(Intent.ACTION_POWER_DISCONNECTED);
 
@@ -253,6 +257,16 @@ public class DeviceSettingsService extends Service {
     private void handleScreenOn() {
         if (Constants.DEBUG) Log.i(TAG, "Screen ON");
 
+        // The kernel ADFR status_reset() re-arms sa_min_fps=1 on every panel
+        // enable/timing switch, which would silently re-enable LTPO after a
+        // screen-off/on. Re-apply the persisted refresh-rate state (including
+        // the LTPO master switch) so the user's choice survives.
+        try {
+            RefreshRateMonitorService.notifyStateChanged(this);
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to re-apply refresh rate on screen on", e);
+        }
+
         // Restart GameBar if needed
         try {
             var prefs = PreferenceManager.getDefaultSharedPreferences(this);
@@ -266,6 +280,21 @@ public class DeviceSettingsService extends Service {
             }
         } catch (Exception e) {
             Log.e(TAG, "Failed to restart GameBar on screen on", e);
+        }
+    }
+
+    // ===== Display Mode Handlers =====
+
+    private void handleDisplayModeChanged() {
+        if (Constants.DEBUG) Log.i(TAG, "Display mode changed");
+
+        // The kernel ADFR status_reset() re-arms sa_min_fps=1 on every timing
+        // switch too, which would silently re-enable LTPO when the user has it
+        // off and SF auto-switches modes (e.g. 120->60 for video). Re-apply.
+        try {
+            RefreshRateMonitorService.notifyStateChanged(this);
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to re-apply refresh rate on mode change", e);
         }
     }
 
