@@ -9,6 +9,7 @@
 package org.lineageos.device.settings.refreshrate;
 
 import android.content.Context;
+import android.content.Intent;
 import android.text.TextUtils;
 import android.util.Log;
 
@@ -150,6 +151,28 @@ public class RefreshRateController {
             }
             return getGlobalRefreshRate();
         }
+    }
+
+    // ===== LTPO master switch =====
+
+    public boolean isLtpoEnabled() {
+        return PreferenceManager.getDefaultSharedPreferences(mContext)
+                .getBoolean(Constants.KEY_LTPO_ENABLED, true);
+    }
+
+    public void setLtpoEnabled(boolean enabled) {
+        PreferenceManager.getDefaultSharedPreferences(mContext)
+                .edit()
+                .putBoolean(Constants.KEY_LTPO_ENABLED, enabled)
+                .apply();
+        if (Constants.DEBUG) Log.i(TAG, "LTPO " + (enabled ? "enabled" : "disabled"));
+
+        // Keep the QS tile (and any other UI) in sync with this change
+        Intent intent = new Intent(Constants.ACTION_LTPO_STATE_CHANGED);
+        intent.setPackage(mContext.getPackageName());
+        mContext.sendBroadcast(intent);
+
+        notifyStateChanged();
     }
 
     // ===== State snapshot =====

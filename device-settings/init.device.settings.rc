@@ -10,5 +10,5 @@ on boot
     chmod 0664 /sys/kernel/oplus_display/test_te
     # ADFR min fps request (0 = dynamic LTPO, N = fixed); written by
     # RefreshRateMonitorService alongside the MIN/PEAK refresh rate settings
-    chown system system /sys/kernel/oplus_display/adfr_min_fps
-    chmod 0664 /sys/kernel/oplus_display/adfr_min_fps
+    chown system system /sys/kernel/oplus_display/min_fps
+    chmod 0664 /sys/kernel/oplus_display/min_fps
