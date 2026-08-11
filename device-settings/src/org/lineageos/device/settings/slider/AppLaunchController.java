@@ -43,15 +43,24 @@ public final class AppLaunchController extends SliderControllerBase {
     // the settings app's SharedPreferences.
     private String[] mPackages = new String[3];
 
+    // Last position we acted on. The tri-state key driver re-reports the
+    // current position on every resume, so acting on the event itself would
+    // launch an app on each screen wake; only a real move changes the state.
+    private int mLastState = -1;
+
     public AppLaunchController(Context context) {
         super(context);
         mPowerManager = context.getSystemService(PowerManager.class);
+        mLastState = readState();
     }
 
     public void updatePackages(String[] packages) {
         if (packages != null && packages.length == 3) {
             mPackages = packages;
         }
+        // Picking this usage, or reassigning an app, must not make the next
+        // event launch: re-sync to where the slider sits right now.
+        mLastState = readState();
     }
 
     @Override
@@ -61,16 +70,15 @@ public final class AppLaunchController extends SliderControllerBase {
             return 0;
         }
 
-        int state;
-        try {
-            state = Integer.parseInt(FileUtils.readLine(Constants.NODE_SLIDER_STATE).trim());
-        } catch (Exception e) {
-            Log.e(TAG, "Failed to read slider state", e);
-            return 0;
-        }
+        int state = readState();
         if (state < 1 || state > 3) {
             return 0;
         }
+        if (state == mLastState) {
+            Log.i(TAG, "slider still at position " + state + ", not launching");
+            return 0;
+        }
+        mLastState = state;
 
         String pkg = mPackages[state - 1];
         if (TextUtils.isEmpty(pkg)) {
@@ -103,7 +111,17 @@ public final class AppLaunchController extends SliderControllerBase {
         return Constants.MODE_APP_LAUNCH;
     }
 
+    private int readState() {
+        try {
+            return Integer.parseInt(FileUtils.readLine(Constants.NODE_SLIDER_STATE).trim());
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to read slider state", e);
+            return -1;
+        }
+    }
+
     @Override
     public void reset() {
+        mLastState = readState();
     }
 }
