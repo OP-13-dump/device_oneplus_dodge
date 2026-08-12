@@ -48,8 +48,7 @@ static const uintptr_t P010_FUNC_OFF = 0x4bf6a0;   // p010LSB2MSBNeon in libAlgo
 static const uintptr_t P010_GOT_OFF  = 0x631b68;   // its JUMP_SLOT GOT entry
 static const uintptr_t DLSYM_GOT_OFF = 0x23ccc58;  // dlsym JUMP_SLOT GOT entry in libAlgoInterface
 
-static inline bool is_buf(uint64_t v)     { uint32_t hi=(uint32_t)(v>>32); return hi>=0x70 && hi<=0x7f && (uint32_t)v >= 0x100000u; }
-static inline bool is_garbage(uint64_t v) { uint32_t hi=(uint32_t)(v>>32); return hi>=0x70 && hi<=0x7f && (uint32_t)v <  0x100000u; }
+static const uint64_t MIN_SNAPSHOT = 0x400000;     // a full-res P010 snapshot is ~0x2400000
 
 static bool range_of(uint64_t addr, uint64_t* out_base, uint64_t* out_size) {
     // Low-Level Read via Linux Syscalls (Zero Locks, Zero Allocations)
@@ -115,24 +114,61 @@ static bool got_redirect(uint64_t slot, void* newval, void** old) {
     return true;
 }
 
+// A plane pointer is "live" if it points into a mapping big enough to hold a snapshot.
+// Deliberately NOT an absolute-address test: the previous 0x70..0x7f high-byte window was
+// pinned to one build's layout, and when the camera buffers moved to 0x6d../0x6f.. the scan
+// stopped matching, repair_struct() silently no-op'd and photos went green again.
+static bool plane_ok(uint64_t v, uint64_t* base, uint64_t* avail) {
+    uint64_t b, s;
+    if (!v || !range_of(v, &b, &s)) return false;
+    uint64_t a = (b + s) - v;
+    if (a < MIN_SNAPSHOT) return false;
+    if (base) *base = b;
+    if (avail) *avail = a;
+    return true;
+}
+
+// One-shot dump of the ARC output struct, so a future blob layout change can be re-derived
+// from logcat alone instead of needing Frida (docs/PORTING.md step 4).
+static int g_dumped = 0;
+static void dump_struct_once(uint8_t* b, uint64_t lim) {
+    if (g_dumped >= 3) return;
+    g_dumped++;
+    for (uint64_t off = 0; off < 0x80 && (uint64_t)(b + off + 8) <= lim; off += 8) {
+        uint64_t v = *(uint64_t*)(b + off), vb, vs;
+        if (range_of(v, &vb, &vs))
+            LOGI("struct +0x%02x = 0x%016llx  [mapped base=0x%llx size=0x%llx avail=0x%llx]",
+                 (unsigned)off, (unsigned long long)v, (unsigned long long)vb,
+                 (unsigned long long)vs, (unsigned long long)((vb + vs) - v));
+        else
+            LOGI("struct +0x%02x = 0x%016llx", (unsigned)off, (unsigned long long)v);
+    }
+}
+
 // ---- (1) chroma struct repair (called from our ARC wrapper) ----
 static void repair_struct(void* p) {
     if (!p) return;
     uint64_t mb, ms; if (!range_of((uint64_t)p, &mb, &ms)) return;
     uint8_t* b = (uint8_t*)p;
-    for (int off = 0; off + 16 <= 0x80; off += 8) {
+    uint64_t lim = mb + ms;
+    dump_struct_once(b, lim);
+    for (int off = 0; off + 16 <= 0x80 && (uint64_t)(b + off + 16) <= lim; off += 8) {
         uint64_t luma = *(uint64_t*)(b + off), chroma = *(uint64_t*)(b + off + 8);
-        if (is_buf(luma) && is_garbage(chroma)) {
-            uint64_t lb, ls; if (!range_of(luma, &lb, &ls)) continue;
-            uint64_t avail = (lb + ls) - luma;
-            uint64_t ysize = (avail * 2 / 3) & ~0xfffULL;        // Y-plane size (=0x1800000), page aligned
-            *(uint64_t*)(b + off + 8) = luma + ysize;            // plane[1] (UV) ptr
-            if (off == 0x40) {                                   // chroma pitch[1]@+0x64 = Y pitch[0]@+0x60
-                uint32_t yp = *(uint32_t*)(b + 0x60);
-                if (yp > 0 && *(uint32_t*)(b + 0x64) == 0) *(uint32_t*)(b + 0x64) = yp;
-            }
-            LOGI("chroma fix: luma=%p -> %p (ysize=0x%llx)", (void*)luma, (void*)(luma + ysize), (unsigned long long)ysize);
+        uint64_t lb, avail;
+        if (!plane_ok(luma, &lb, &avail)) continue;
+        uint64_t cb, cs;                                     // sane UV ptr = inside the Y mapping
+        if (chroma && range_of(chroma, &cb, &cs) && cb == lb) continue;
+        uint64_t ysize = (avail * 2 / 3) & ~0xfffULL;        // Y-plane size (=0x1800000), page aligned
+        *(uint64_t*)(b + off + 8) = luma + ysize;            // plane[1] (UV) ptr
+        uint32_t yp = 0;                                     // pitch[1] = pitch[0] (luma+0x40 -> pitch+0x60)
+        if ((uint64_t)(b + off + 0x28) <= lim) {
+            yp = *(uint32_t*)(b + off + 0x20);
+            if (yp > 0 && *(uint32_t*)(b + off + 0x24) == 0) *(uint32_t*)(b + off + 0x24) = yp;
         }
+        LOGI("chroma fix @+0x%x: luma=%p chroma=%p -> %p (avail=0x%llx ysize=0x%llx pitch=%u)",
+             off, (void*)luma, (void*)chroma, (void*)(luma + ysize),
+             (unsigned long long)avail, (unsigned long long)ysize, yp);
+        return;
     }
 }
 // ARC_Turbo_RAW_Process takes x0-x7 PLUS ~7 stack args, so we CANNOT use a C wrapper (it would

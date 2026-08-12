@@ -22,7 +22,10 @@ device or a camera-blob OTA.
 - The chroma offset = `2/3 * mapping_size` (Y plane of a 4:2:0 P010 buffer), page aligned.
 - `pitch[1] = pitch[0]`.
 - The conversion fix `w5 = (2/3 * avail) / w4` (makes the loop's `w4*w5*1.5` span exactly the buffer).
-- The repair scan (find a `0x76..` valid ptr immediately followed by a `0x77..`-garbage ptr).
+- The repair scan: a plane ptr whose mapping is >= 4MB, immediately followed by a chroma ptr
+  that is null or lands outside that mapping. (It used to test for a `0x76..`/`0x77..` high
+  byte -- that was pinned to one build's address-space layout, and silently stopped matching
+  when the buffers moved to `0x6d..`/`0x6f..`, which brought the green frames back.)
 - The naked-asm trampoline for `ARC_Turbo_RAW_Process` (it has stack args; a C wrapper drops them).
 - The `dlsym` symbol name `"ARC_Turbo_RAW_Process"`.
 
