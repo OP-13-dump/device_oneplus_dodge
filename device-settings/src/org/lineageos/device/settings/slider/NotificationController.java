@@ -62,17 +62,24 @@ public final class NotificationController extends SliderControllerBase {
 
     @Override
     protected int processAction(int action) {
-        Log.i(TAG, "slider action: " + action);
+        return processAction(action, false);
+    }
+
+    @Override
+    protected int processAction(int action, boolean isRestore) {
+        Log.i(TAG, "slider action: " + action + ", isRestore: " + isRestore);
         if (MODES.indexOfKey(action) >= 0) {
             mZenMode = MODES.indexOfKey(action);
             mAudioManager.setRingerModeInternal(AudioManager.RINGER_MODE_NORMAL);
-            mHandler.postDelayed(new Runnable() {
-                @Override
-                public void run() {
-                    if (mZenMode != MODES.indexOfKey(action)) return;
-                    mNotificationManager.setZenMode(MODES.get(action), null, TAG);
-                }
-            }, CHANGE_DELAY);
+            if (!isRestore || action != NOTIFICATION_ALL) {
+                mHandler.postDelayed(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (mZenMode != MODES.indexOfKey(action)) return;
+                        mNotificationManager.setZenMode(MODES.get(action), null, TAG);
+                    }
+                }, CHANGE_DELAY);
+            }
             switch (action) {
                 case NOTIFICATION_TOTAL_SILENCE:
                     return Constants.MODE_TOTAL_SILENCE;

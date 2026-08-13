@@ -54,12 +54,19 @@ public final class NotificationRingerController extends SliderControllerBase {
 
     @Override
     protected int processAction(int action) {
-        Log.i(TAG, "slider action: " + action);
+        return processAction(action, false);
+    }
+
+    @Override
+    protected int processAction(int action, boolean isRestore) {
+        Log.i(TAG, "slider action: " + action + ", isRestore: " + isRestore);
 
         switch (action) {
             case RINGER_VIBRATE:
                 mRingMode = RINGER_VIBRATE;
-                mNotificationManager.setZenMode(Settings.Global.ZEN_MODE_OFF, null, TAG);
+                if (!isRestore) {
+                    mNotificationManager.setZenMode(Settings.Global.ZEN_MODE_OFF, null, TAG);
+                }
                 mHandler.postDelayed(new Runnable() {
                     @Override
                     public void run() {
@@ -70,7 +77,9 @@ public final class NotificationRingerController extends SliderControllerBase {
                 return Constants.MODE_VIBRATE;
             case RINGER_SILENT:
                 mRingMode = RINGER_SILENT;
-                mNotificationManager.setZenMode(Settings.Global.ZEN_MODE_OFF, null, TAG);
+                if (!isRestore) {
+                    mNotificationManager.setZenMode(Settings.Global.ZEN_MODE_OFF, null, TAG);
+                }
                 mHandler.postDelayed(new Runnable() {
                     @Override
                     public void run() {
@@ -103,7 +112,9 @@ public final class NotificationRingerController extends SliderControllerBase {
                 return Constants.MODE_PRIORITY_ONLY;
             case NOTIFICATION_ALL:
                 mRingMode = NOTIFICATION_ALL;
-                mNotificationManager.setZenMode(Settings.Global.ZEN_MODE_OFF, null, TAG);
+                if (!isRestore) {
+                    mNotificationManager.setZenMode(Settings.Global.ZEN_MODE_OFF, null, TAG);
+                }
                 mHandler.postDelayed(new Runnable() {
                     @Override
                     public void run() {
