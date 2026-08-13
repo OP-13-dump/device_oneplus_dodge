@@ -56,6 +56,10 @@ public abstract class SliderControllerBase {
 
     protected abstract int processAction(int action);
 
+    protected int processAction(int action, boolean isRestore) {
+        return processAction(action);
+    }
+
     public final int processEvent(Context context) {
         int result = restoreState(context, true);
         if (result > 0) {
@@ -93,7 +97,7 @@ public abstract class SliderControllerBase {
         try {
             int state = Integer.parseInt(FileUtils.readLine(Constants.NODE_SLIDER_STATE).trim());
             mFeedbackPackage = null;
-            ret = processAction(mActions[state - 1]);
+            ret = processAction(mActions[state - 1], !notify);
             if (ret > 0 && notify) {
                 sendUpdateBroadcast(context, state - 1, ret, mFeedbackPackage);
             }
