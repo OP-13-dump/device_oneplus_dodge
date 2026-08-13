@@ -29,12 +29,12 @@ device or a camera-blob OTA.
 - The naked-asm trampoline for `ARC_Turbo_RAW_Process` (it has stack args; a C wrapper drops them).
 - The `dlsym` symbol name `"ARC_Turbo_RAW_Process"`.
 
-**Pinned per blob (`apsfixup.cpp` constants):**
-| constant | what it is | lib |
-|---|---|---|
-| `P010_FUNC_OFF` | `APSFormatConverterNeon::p010LSB2MSBNeon` | libAlgoProcess.so |
-| `P010_GOT_OFF`  | that function's `R_AARCH64_JUMP_SLOT` GOT entry | libAlgoProcess.so |
-| `DLSYM_GOT_OFF` | the `dlsym@LIBC` `R_AARCH64_JUMP_SLOT` GOT entry | libAlgoInterface.so |
+**No longer pinned.** `apsfixup.cpp` walks the in-memory ELF (`dynsym` + `JMPREL`)
+to find the `p010LSB2MSBNeon` and `dlsym` `R_AARCH64_JUMP_SLOT`s, and
+`wrap_dlsym` interposes every `ARC_Turbo_*_Process` (RAW, HDR, Bokeh). A
+camera-blob OTA should not need a code change unless the output-struct
+field offsets move (step 4) or ArcSoft stops resolving those functions
+through `dlsym`.
 
 Plus the **output-struct field offsets** in `repair_struct()` (`+0x40` luma, `+0x48` chroma,
 `+0x60` pitch[0], `+0x64` pitch[1]) — these are the ArcSoft ASVL output struct and are usually
