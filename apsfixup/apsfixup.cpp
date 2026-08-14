@@ -160,9 +160,10 @@ static void repair_struct(void* p) {
         uint64_t lb, avail;
         if (!plane_ok(luma, &lb, &avail)) continue;
         uint64_t cb, cs;
-        // Only rewrite a chroma pointer that is actually garbage (null or
-        // unmapped). A live pointer in a different mapping is a valid UV
-        // plane or a bokeh/disparity buffer -- do not touch it.
+        // 0x41 and other packed flags are not plane pointers. Userspace
+        // pointers on this device have a non-zero high dword.
+        if (chroma && (chroma < 0x10000ull || (chroma >> 32) == 0)) continue;
+        // A live pointer in any mapping is a valid UV / bokeh buffer.
         if (chroma && range_of(chroma, &cb, &cs)) continue;
         uint64_t ysize = (avail * 2 / 3) & ~0xfffULL;
         *(uint64_t*)(b + off + 8) = luma + ysize;
@@ -275,6 +276,7 @@ static bool is_arc_process(const char* s) {
 
 typedef void* (*dlsym_t)(void*, const char*);
 static dlsym_t g_real_dlsym = nullptr;
+static void patch_cached_tfrsn();
 
 static void* wrap_dlsym(void* handle, const char* symbol) {
     void* res = g_real_dlsym(handle, symbol);
@@ -282,6 +284,7 @@ static void* wrap_dlsym(void* handle, const char* symbol) {
     if (symbol && !strcmp(symbol, "ARC_Turbo_RAW_Bokeh_Process")) {
         aps_raw_bokeh_loaded = 1;
         LOGI("RAW_Bokeh loaded (real=%p) -- not wrapping; TFRSN work will return -1", res);
+        patch_cached_tfrsn();
         return res;
     }
 
@@ -465,9 +468,97 @@ static bool same_module(uint64_t a, uint64_t b) {
     return range_of(a, &ab, &as_) && range_of(b, &bb, &bs) && ab == bb;
 }
 
-static bool g_p010_done = false, g_dlsym_done = false;
-static uint64_t g_p010_got = 0, g_p010_func = 0, g_dlsym_got = 0;
-static bool g_p010_found = false, g_dlsym_found = false;
+static bool g_p010_done = false;
+static uint64_t g_p010_got = 0, g_p010_func = 0;
+static bool g_p010_found = false;
+static bool g_dlsym_iface_done = false, g_dlsym_proc_done = false;
+static bool g_dlsym_iface_found = false, g_dlsym_proc_found = false;
+static uint64_t g_dlsym_iface_got = 0, g_dlsym_proc_got = 0;
+static bool g_tfrsn_patched = false;
+
+static bool hook_dlsym_in(const char* mod, uint64_t hint, bool* done, bool* found,
+                          uint64_t* got_off) {
+    if (*done) return true;
+    uint64_t base;
+    if (!module_base(mod, &base)) return false;
+    if (!*found) {
+        uint64_t got = 0, func = 0;
+        if (!elf_find_jmpslot(base, hint, "dlsym", false, &got, &func)) return false;
+        *got_off = got;
+        *found = true;
+        LOGI("ELF dlsym GOT=+0x%llx in %s", (unsigned long long)got, mod);
+    }
+    uint64_t slot = base + *got_off;
+    void* cur = nullptr;
+    if (!got_slot_mapped(slot, &cur) || !cur ||
+        !same_module((uint64_t)cur, (uint64_t)(void*)dlsym))
+        return false;
+    void* old = nullptr;
+    if (!got_redirect(slot, (void*)wrap_dlsym, &old)) return false;
+    if (!g_real_dlsym) g_real_dlsym = (dlsym_t)old;
+    *done = true;
+    LOGI("GOT-hooked dlsym in %s (real=%p)", mod, old);
+    return true;
+}
+
+// Overwrite cached TFRSN function pointers in AlgoInterface / AlgoProcess.
+// Close-up never dlsym'd those names through the Interface GOT -- they were
+// already resolved (AlgoProcess dlsym, or a load before our hook) and the
+// real PreProcess ran. Scanning writable mappings for the export address
+// catches the cached pointers.
+static int replace_ptrs_in_module(const char* mod, void* from, void* to) {
+    if (!from || !to || from == to) return 0;
+    FILE* f = fopen("/proc/self/maps", "re");
+    if (!f) return 0;
+    char line[512];
+    int n = 0;
+    while (fgets(line, sizeof(line), f)) {
+        if (!strstr(line, mod) || !strchr(line, 'w')) continue;
+        uint64_t lo = 0, hi = 0;
+        if (sscanf(line, "%" SCNx64 "-%" SCNx64, &lo, &hi) != 2 || hi <= lo) continue;
+        for (uint64_t p = lo; p + sizeof(void*) <= hi; p += sizeof(void*)) {
+            if (*(void**)p != from) continue;
+            void* old = nullptr;
+            if (got_redirect(p, to, &old)) {
+                n++;
+                LOGI("patched cached %s ptr @+0x%llx in %s", "TFRSN",
+                     (unsigned long long)(p - lo), mod);
+            }
+        }
+    }
+    fclose(f);
+    return n;
+}
+
+static void patch_cached_tfrsn() {
+    if (g_tfrsn_patched || !g_real_dlsym) return;
+    uint64_t fusion = 0;
+    if (!module_base("libarcsoft_turbo_fusion_raw_super_night.so", &fusion)) return;
+
+    struct Item {
+        const char* name;
+        void (*tramp)();
+        void** slot;
+    } items[] = {
+        {"ARC_TFRSN_PreProcess", wrap_tfrsn_pre, &aps_real_tfrsn_pre},
+        {"ARC_TFRSN_Process", wrap_tfrsn_proc, &aps_real_tfrsn_proc},
+        {"ARC_TFRSN_PostProcess", wrap_tfrsn_post, &aps_real_tfrsn_post},
+        {"ARC_TFRSN_Bokeh_Process", wrap_tfrsn_bokeh, &aps_real_tfrsn_bokeh},
+    };
+    int n = 0;
+    for (Item& it : items) {
+        void* real = g_real_dlsym(RTLD_DEFAULT, it.name);
+        if (!real) continue;
+        if (!*it.slot) *it.slot = real;
+        n += replace_ptrs_in_module("libAlgoInterface.so", real, (void*)it.tramp);
+        n += replace_ptrs_in_module("libAlgoProcess.so", real, (void*)it.tramp);
+    }
+    if (n > 0) {
+        g_tfrsn_patched = true;
+        LOGI("patched %d cached TFRSN pointer(s) close-up-skip=%u", n,
+             (unsigned)aps_raw_bokeh_loaded);
+    }
+}
 
 static void try_install() {
     uint64_t base;
@@ -498,48 +589,33 @@ static void try_install() {
         }
     }
 
-    if (!g_dlsym_done && module_base("libAlgoInterface.so", &base)) {
-        if (!g_dlsym_found) {
-            uint64_t got = 0, func = 0;
-            if (elf_find_jmpslot(base, 0x2800000, "dlsym", false, &got, &func)) {
-                g_dlsym_got = got;
-                g_dlsym_found = true;
-                LOGI("ELF dlsym GOT=+0x%llx", (unsigned long long)got);
-            }
-        }
-        if (g_dlsym_found) {
-            uint64_t slot = base + g_dlsym_got;
-            void* cur = nullptr;
-            if (got_slot_mapped(slot, &cur) && cur &&
-                same_module((uint64_t)cur, (uint64_t)(void*)dlsym)) {
-                void* old = nullptr;
-                if (got_redirect(slot, (void*)wrap_dlsym, &old)) {
-                    g_real_dlsym = (dlsym_t)old;
-                    LOGI("GOT-hooked dlsym in libAlgoInterface (real=%p)", old);
-                    g_dlsym_done = true;
-                }
-            }
-        }
-    }
+    hook_dlsym_in("libAlgoInterface.so", 0x2800000, &g_dlsym_iface_done, &g_dlsym_iface_found,
+                  &g_dlsym_iface_got);
+    hook_dlsym_in("libAlgoProcess.so", 0x800000, &g_dlsym_proc_done, &g_dlsym_proc_found,
+                  &g_dlsym_proc_got);
+    patch_cached_tfrsn();
 }
 
 static void* poller(void*) {
-    for (int i = 0; i < 24000 && !(g_p010_done && g_dlsym_done); i++) {
+    for (int i = 0; i < 24000; i++) {
         try_install();
+        uint64_t fusion = 0;
+        bool have_fusion = module_base("libarcsoft_turbo_fusion_raw_super_night.so", &fusion);
+        if (g_p010_done && g_dlsym_iface_done && g_dlsym_proc_done &&
+            (g_tfrsn_patched || (!have_fusion && i > 200)))
+            break;
         usleep(25 * 1000);
     }
-    if (!(g_p010_done && g_dlsym_done))
-        LOGW("install incomplete: p010=%d (found=%d) dlsym=%d (found=%d)", g_p010_done,
-             g_p010_found, g_dlsym_done, g_dlsym_found);
+    if (!g_p010_done || !g_dlsym_iface_done)
+        LOGW("install incomplete: p010=%d iface_dlsym=%d proc_dlsym=%d tfrsn=%d", g_p010_done,
+             g_dlsym_iface_done, g_dlsym_proc_done, g_tfrsn_patched);
     return nullptr;
 }
 
 __attribute__((constructor)) static void apsfixup_init() {
-    LOGI("libapsfixup loaded (pid %d) elf-discover + RAW/HDR wrap, no RAW_Bokeh", getpid());
+    LOGI("libapsfixup loaded (pid %d) RAW/HDR wrap, TFRSN cache patch, no RAW_Bokeh", getpid());
     try_install();
-    if (!(g_p010_done && g_dlsym_done)) {
-        pthread_t t;
-        pthread_create(&t, nullptr, poller, nullptr);
-        pthread_detach(t);
-    }
+    pthread_t t;
+    pthread_create(&t, nullptr, poller, nullptr);
+    pthread_detach(t);
 }
