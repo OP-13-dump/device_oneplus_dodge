@@ -35,6 +35,7 @@
 #include <link.h>
 #include <pthread.h>
 #include <stdint.h>
+#include <sys/system_properties.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/mman.h>
@@ -283,7 +284,8 @@ static void* wrap_dlsym(void* handle, const char* symbol) {
 
     if (symbol && !strcmp(symbol, "ARC_Turbo_RAW_Bokeh_Process")) {
         aps_raw_bokeh_loaded = 1;
-        LOGI("RAW_Bokeh loaded (real=%p) -- not wrapping; TFRSN work will return -1", res);
+        __system_property_set("vendor.camera.arcsoft.tfrsn.bypass", "1");
+        LOGI("RAW_Bokeh loaded (real=%p) -- not wrapping; TFRSN bypass=1", res);
         patch_cached_tfrsn();
         return res;
     }
@@ -321,10 +323,12 @@ static void* wrap_dlsym(void* handle, const char* symbol) {
         tramp = wrap_arc_raw;
     } else if (!strcmp(symbol, "ARC_Turbo_HDR_Process")) {
         aps_raw_bokeh_loaded = 0;
+        __system_property_set("vendor.camera.arcsoft.tfrsn.bypass", "0");
         slot = &aps_real_hdr;
         tramp = wrap_arc_hdr;
     } else if (!strcmp(symbol, "ARC_Turbo_HDR_Bokeh_Process")) {
         aps_raw_bokeh_loaded = 0;
+        __system_property_set("vendor.camera.arcsoft.tfrsn.bypass", "0");
         slot = &aps_real_hdr_bokeh;
         tramp = wrap_arc_hdr_bokeh;
     } else {
@@ -506,24 +510,25 @@ static bool hook_dlsym_in(const char* mod, uint64_t hint, bool* done, bool* foun
 // already resolved (AlgoProcess dlsym, or a load before our hook) and the
 // real PreProcess ran. Scanning writable mappings for the export address
 // catches the cached pointers.
-static int replace_ptrs_in_module(const char* mod, void* from, void* to) {
+static int replace_ptrs_writable(void* from, void* to) {
     if (!from || !to || from == to) return 0;
     FILE* f = fopen("/proc/self/maps", "re");
     if (!f) return 0;
     char line[512];
     int n = 0;
     while (fgets(line, sizeof(line), f)) {
-        if (!strstr(line, mod) || !strchr(line, 'w')) continue;
+        // Heap-cached fn ptrs live in anon rw mappings, not the .so
+        // data segment. Scan every writable mapping except the stack
+        // guard / device nodes.
+        if (!strchr(line, 'w') || strstr(line, "/dev/") || strstr(line, "[vvar]"))
+            continue;
         uint64_t lo = 0, hi = 0;
         if (sscanf(line, "%" SCNx64 "-%" SCNx64, &lo, &hi) != 2 || hi <= lo) continue;
+        if (hi - lo > 64ull * 1024 * 1024) continue;  // skip giant ashmem
         for (uint64_t p = lo; p + sizeof(void*) <= hi; p += sizeof(void*)) {
             if (*(void**)p != from) continue;
             void* old = nullptr;
-            if (got_redirect(p, to, &old)) {
-                n++;
-                LOGI("patched cached %s ptr @+0x%llx in %s", "TFRSN",
-                     (unsigned long long)(p - lo), mod);
-            }
+            if (got_redirect(p, to, &old)) n++;
         }
     }
     fclose(f);
@@ -550,13 +555,14 @@ static void patch_cached_tfrsn() {
         void* real = g_real_dlsym(RTLD_DEFAULT, it.name);
         if (!real) continue;
         if (!*it.slot) *it.slot = real;
-        n += replace_ptrs_in_module("libAlgoInterface.so", real, (void*)it.tramp);
-        n += replace_ptrs_in_module("libAlgoProcess.so", real, (void*)it.tramp);
+        n += replace_ptrs_writable(real, (void*)it.tramp);
     }
     if (n > 0) {
         g_tfrsn_patched = true;
         LOGI("patched %d cached TFRSN pointer(s) close-up-skip=%u", n,
              (unsigned)aps_raw_bokeh_loaded);
+    } else {
+        LOGW("TFRSN exports live but no cached pointers found yet");
     }
 }
 
