@@ -14,9 +14,16 @@
 // Durable across firmware bumps:
 //   * JUMP_SLOT offsets are discovered by walking the in-memory ELF (dynsym +
 //     JMPREL). No pinned BuildId / P010_FUNC_OFF / DLSYM_GOT_OFF.
-//   * wrap_dlsym interposes every ARC_Turbo_*_Process (RAW, HDR, and the Bokeh
-//     variants). A.01+ routes stills through TURBOHDR; hooking only RAW left
-//     those frames uncorrected (OpenCL then ION-failed and the JPEG was green).
+//   * wrap_dlsym interposes ARC_Turbo_RAW_Process and ARC_Turbo_HDR_Process
+//     (and HDR_Bokeh for portrait). A.01+ routes stills through TURBOHDR;
+//     hooking only RAW left those frames uncorrected (OpenCL then ION-failed
+//     and the JPEG was green).
+//   * RAW_Bokeh is NOT wrapped: close-up dlsyms it, then runs TFRSN night
+//     fusion. The P010 chroma heuristic is for 12.5MP stills, not bokeh /
+//     disparity structs. Wrapping it + letting TFRSN_PreProcess run left
+//     DeferJob / CapThread wedged and the shutter frozen (APS pending ~300).
+//   * Unknown ARC_Turbo_*_Process names are passed through. Aliasing them
+//     onto the HDR trampoline overwrote aps_real_hdr.
 //   * A first-try GOT miss is retried, not latched as "blob drift". BIND_NOW
 //     may not have filled the slot yet when our constructor runs.
 //
@@ -153,7 +160,10 @@ static void repair_struct(void* p) {
         uint64_t lb, avail;
         if (!plane_ok(luma, &lb, &avail)) continue;
         uint64_t cb, cs;
-        if (chroma && range_of(chroma, &cb, &cs) && cb == lb) continue;
+        // Only rewrite a chroma pointer that is actually garbage (null or
+        // unmapped). A live pointer in a different mapping is a valid UV
+        // plane or a bokeh/disparity buffer -- do not touch it.
+        if (chroma && range_of(chroma, &cb, &cs)) continue;
         uint64_t ysize = (avail * 2 / 3) & ~0xfffULL;
         *(uint64_t*)(b + off + 8) = luma + ysize;
         uint32_t yp = 0;
@@ -218,6 +228,40 @@ extern "C" __attribute__((visibility("hidden"))) void* aps_real_raw = nullptr;
 extern "C" __attribute__((visibility("hidden"))) void* aps_real_raw_bokeh = nullptr;
 extern "C" __attribute__((visibility("hidden"))) void* aps_real_hdr = nullptr;
 extern "C" __attribute__((visibility("hidden"))) void* aps_real_hdr_bokeh = nullptr;
+extern "C" __attribute__((visibility("hidden"))) void* aps_real_tfrsn_pre = nullptr;
+extern "C" __attribute__((visibility("hidden"))) void* aps_real_tfrsn_proc = nullptr;
+extern "C" __attribute__((visibility("hidden"))) void* aps_real_tfrsn_post = nullptr;
+extern "C" __attribute__((visibility("hidden"))) void* aps_real_tfrsn_bokeh = nullptr;
+
+// Set when close-up dlsyms RAW_Bokeh. Cleared when HDR_Process is looked
+// up again (back to normal stills). TFRSN trampolines read this at call
+// time because AlgoInterface caches the first dlsym.
+extern "C" __attribute__((visibility("hidden"))) unsigned char aps_raw_bokeh_loaded = 0;
+
+#define TFRSN_TRAMP(tag)                                                          \
+    extern "C" void wrap_tfrsn_##tag();                                           \
+    __asm__(                                                                      \
+        "    .text\n"                                                             \
+        "    .balign 4\n"                                                         \
+        "    .global wrap_tfrsn_" #tag "\n"                                       \
+        "    .type wrap_tfrsn_" #tag ", %function\n"                              \
+        "wrap_tfrsn_" #tag ":\n"                                                  \
+        "    adrp x16, aps_raw_bokeh_loaded\n"                                    \
+        "    add  x16, x16, #:lo12:aps_raw_bokeh_loaded\n"                        \
+        "    ldrb w16, [x16]\n"                                                   \
+        "    cbz  w16, 1f\n"                                                      \
+        "    mov  w0, #-1\n"                                                      \
+        "    ret\n"                                                               \
+        "1:\n"                                                                    \
+        "    adrp x16, aps_real_tfrsn_" #tag "\n"                                 \
+        "    add  x16, x16, #:lo12:aps_real_tfrsn_" #tag "\n"                      \
+        "    ldr  x16, [x16]\n"                                                   \
+        "    br   x16\n");
+
+TFRSN_TRAMP(pre)
+TFRSN_TRAMP(proc)
+TFRSN_TRAMP(post)
+TFRSN_TRAMP(bokeh)
 
 static bool is_arc_process(const char* s) {
     if (!s) return false;
@@ -234,6 +278,37 @@ static dlsym_t g_real_dlsym = nullptr;
 
 static void* wrap_dlsym(void* handle, const char* symbol) {
     void* res = g_real_dlsym(handle, symbol);
+
+    if (symbol && !strcmp(symbol, "ARC_Turbo_RAW_Bokeh_Process")) {
+        aps_raw_bokeh_loaded = 1;
+        LOGI("RAW_Bokeh loaded (real=%p) -- not wrapping; TFRSN work will return -1", res);
+        return res;
+    }
+
+    if (res && symbol && !strncmp(symbol, "ARC_TFRSN_", 10)) {
+        void** slot = nullptr;
+        void (*tramp)() = nullptr;
+        if (!strcmp(symbol, "ARC_TFRSN_PreProcess")) {
+            slot = &aps_real_tfrsn_pre;
+            tramp = wrap_tfrsn_pre;
+        } else if (!strcmp(symbol, "ARC_TFRSN_Process")) {
+            slot = &aps_real_tfrsn_proc;
+            tramp = wrap_tfrsn_proc;
+        } else if (!strcmp(symbol, "ARC_TFRSN_PostProcess")) {
+            slot = &aps_real_tfrsn_post;
+            tramp = wrap_tfrsn_post;
+        } else if (!strcmp(symbol, "ARC_TFRSN_Bokeh_Process")) {
+            slot = &aps_real_tfrsn_bokeh;
+            tramp = wrap_tfrsn_bokeh;
+        }
+        if (slot) {
+            *slot = res;
+            LOGI("interposing %s (real=%p) close-up-skip=%u", symbol, res,
+                 (unsigned)aps_raw_bokeh_loaded);
+            return (void*)tramp;
+        }
+    }
+
     if (!res || !is_arc_process(symbol)) return res;
 
     void** slot = nullptr;
@@ -241,20 +316,19 @@ static void* wrap_dlsym(void* handle, const char* symbol) {
     if (!strcmp(symbol, "ARC_Turbo_RAW_Process")) {
         slot = &aps_real_raw;
         tramp = wrap_arc_raw;
-    } else if (!strcmp(symbol, "ARC_Turbo_RAW_Bokeh_Process")) {
-        slot = &aps_real_raw_bokeh;
-        tramp = wrap_arc_raw_bokeh;
     } else if (!strcmp(symbol, "ARC_Turbo_HDR_Process")) {
+        aps_raw_bokeh_loaded = 0;
         slot = &aps_real_hdr;
         tramp = wrap_arc_hdr;
     } else if (!strcmp(symbol, "ARC_Turbo_HDR_Bokeh_Process")) {
+        aps_raw_bokeh_loaded = 0;
         slot = &aps_real_hdr_bokeh;
         tramp = wrap_arc_hdr_bokeh;
     } else {
-        // Unknown *Process -- still repair via the HDR trampoline so a renamed
-        // sibling does not silently skip the chroma fix.
-        slot = &aps_real_hdr;
-        tramp = wrap_arc_hdr;
+        // Unknown *Process (MoonLight, renamed siblings, ...). Pass through.
+        // Do not alias onto the HDR trampoline -- that overwrites aps_real_hdr.
+        LOGI("not interposing %s (real=%p)", symbol, res);
+        return res;
     }
     *slot = res;
     LOGI("interposing %s (real=%p)", symbol, res);
@@ -270,6 +344,12 @@ static void wrap_p010(uint16_t* dst, uint16_t* src, uint32_t w2, uint32_t w3, ui
         if (range_of((uint64_t)src, &sb, &ss)) {
             uint64_t avail = (sb + ss) - (uint64_t)src;
             uint32_t new_w5 = (uint32_t)((avail * 2 / 3) / w4);
+            // A huge ION mapping would compute a gigantic height and look like
+            // a hang inside p010LSB2MSBNeon. Never grow w5 past 2x the stated
+            // height (w3) or 16384.
+            uint32_t cap = w3 > 0 ? w3 * 2 : 16384u;
+            if (cap > 16384u) cap = 16384u;
+            if (new_w5 > cap) new_w5 = cap;
             if (new_w5 > 0 && new_w5 != w5) {
                 LOGI("p010 fix: avail=0x%llx w4=%u w5 %u->%u", (unsigned long long)avail, w4, w5,
                      new_w5);
@@ -455,7 +535,7 @@ static void* poller(void*) {
 }
 
 __attribute__((constructor)) static void apsfixup_init() {
-    LOGI("libapsfixup loaded (pid %d) elf-discover + HDR/RAW Process wrap", getpid());
+    LOGI("libapsfixup loaded (pid %d) elf-discover + RAW/HDR wrap, no RAW_Bokeh", getpid());
     try_install();
     if (!(g_p010_done && g_dlsym_done)) {
         pthread_t t;
