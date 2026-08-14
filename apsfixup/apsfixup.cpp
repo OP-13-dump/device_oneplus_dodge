@@ -161,11 +161,12 @@ static void repair_struct(void* p) {
         uint64_t lb, avail;
         if (!plane_ok(luma, &lb, &avail)) continue;
         uint64_t cb, cs;
-        // 0x41 and other packed flags are not plane pointers. Userspace
-        // pointers on this device have a non-zero high dword.
-        if (chroma && (chroma < 0x10000ull || (chroma >> 32) == 0)) continue;
-        // A live pointer in any mapping is a valid UV / bokeh buffer.
-        if (chroma && range_of(chroma, &cb, &cs)) continue;
+        // Packed flags (0x41 etc.) are not planes. Skip them so we don't
+        // smash metadata at the start of the struct.
+        if (chroma && chroma < 0x10000ull) continue;
+        // Same mapping as luma => UV is already correct. A different
+        // mapping is the port's garbage chroma (green frames).
+        if (chroma && range_of(chroma, &cb, &cs) && cb == lb) continue;
         uint64_t ysize = (avail * 2 / 3) & ~0xfffULL;
         *(uint64_t*)(b + off + 8) = luma + ysize;
         uint32_t yp = 0;
@@ -282,12 +283,13 @@ static void patch_cached_tfrsn();
 static void* wrap_dlsym(void* handle, const char* symbol) {
     void* res = g_real_dlsym(handle, symbol);
 
-    if (symbol && !strcmp(symbol, "ARC_Turbo_RAW_Bokeh_Process")) {
+    if (res && symbol && !strcmp(symbol, "ARC_Turbo_RAW_Bokeh_Process")) {
         aps_raw_bokeh_loaded = 1;
         __system_property_set("vendor.camera.arcsoft.tfrsn.bypass", "1");
-        LOGI("RAW_Bokeh loaded (real=%p) -- not wrapping; TFRSN bypass=1", res);
+        aps_real_raw_bokeh = res;
         patch_cached_tfrsn();
-        return res;
+        LOGI("interposing RAW_Bokeh (real=%p) TFRSN bypass=1", res);
+        return (void*)wrap_arc_raw_bokeh;
     }
 
     if (res && symbol && !strncmp(symbol, "ARC_TFRSN_", 10)) {
