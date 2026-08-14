@@ -512,6 +512,11 @@ static bool hook_dlsym_in(const char* mod, uint64_t hint, bool* done, bool* foun
 // already resolved (AlgoProcess dlsym, or a load before our hook) and the
 // real PreProcess ran. Scanning writable mappings for the export address
 // catches the cached pointers.
+//
+// Do NOT reuse got_redirect() here. That helper mprotects the page back to
+// PROT_READ (correct for RELRO GOT). These hits live in anonymous heap /
+// .so data, and flipping the page to read-only leaves preview_asd locking
+// a destroyed mutex; FORTIFY then aborts the camera on user builds.
 static int replace_ptrs_writable(void* from, void* to) {
     if (!from || !to || from == to) return 0;
     FILE* f = fopen("/proc/self/maps", "re");
@@ -522,15 +527,16 @@ static int replace_ptrs_writable(void* from, void* to) {
         // Heap-cached fn ptrs live in anon rw mappings, not the .so
         // data segment. Scan every writable mapping except the stack
         // guard / device nodes.
-        if (!strchr(line, 'w') || strstr(line, "/dev/") || strstr(line, "[vvar]"))
+        if (!strchr(line, 'w') || strstr(line, "/dev/") || strstr(line, "[vvar]") ||
+            strstr(line, "[stack]") || strstr(line, "stack_and_tls"))
             continue;
         uint64_t lo = 0, hi = 0;
         if (sscanf(line, "%" SCNx64 "-%" SCNx64, &lo, &hi) != 2 || hi <= lo) continue;
         if (hi - lo > 64ull * 1024 * 1024) continue;  // skip giant ashmem
         for (uint64_t p = lo; p + sizeof(void*) <= hi; p += sizeof(void*)) {
             if (*(void**)p != from) continue;
-            void* old = nullptr;
-            if (got_redirect(p, to, &old)) n++;
+            *(void**)p = to;
+            n++;
         }
     }
     fclose(f);
