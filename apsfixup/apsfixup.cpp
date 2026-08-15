@@ -34,11 +34,15 @@
 #include <inttypes.h>
 #include <link.h>
 #include <pthread.h>
+#include <setjmp.h>
 #include <stdint.h>
-#include <sys/system_properties.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <jpeglib.h>
 #include <string.h>
 #include <sys/mman.h>
+#include <sys/stat.h>
+#include <sys/system_properties.h>
 #include <unistd.h>
 
 #define TAG "apsfixup"
@@ -574,6 +578,435 @@ static void patch_cached_tfrsn() {
     }
 }
 
+// ---- Quick JPEG U/V swap -------------------------------------------------
+// Photo-mode Quick JPEG 1280x960 NV12 (and the 960x1280 JPEG made from it)
+// is a perfect Cb/Cr swap vs the APS final. Swap the YUV before encode, and
+// swap the JPEG at the encode output / _quick.jpg if the YUV was missed.
+//
+// Never walk every /dmabuf looking for JPEG. GPU-only mappings are in
+// /proc/self/maps as rw and SEGV_ACCERR when touched — that is the burst
+// "defer job process crash". Exact-size 1280x960 YUV mappings (including
+// dmabuf of 1843200 etc.) are CPU-linear and safe.
+
+static void* qj_untag(void* p) {
+    return reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(p) & ((1ULL << 56) - 1));
+}
+
+static bool qj_is_quick_wh(int w, int h) {
+    return (w == 960 && h == 1280) || (w == 1280 && h == 960);
+}
+
+static bool qj_looks_quick_yuv(size_t sz) {
+    return sz == 1843200 || sz == 1884160 || sz == 1847296 || sz == 1867776;
+}
+
+#define QJ_UV_MARK "APSFIXUP-UV1"
+
+static pthread_mutex_t g_uv_mu = PTHREAD_MUTEX_INITIALIZER;
+static uint64_t g_yuv_done[32]{};
+static int g_yuv_n = 0;
+
+static bool qj_yuv_already(uint64_t p) {
+    for (int i = 0; i < g_yuv_n && i < 32; i++)
+        if (g_yuv_done[i] == p) return true;
+    return false;
+}
+
+static void qj_yuv_remember(uint64_t p) {
+    g_yuv_done[g_yuv_n % 32] = p;
+    g_yuv_n++;
+}
+
+static bool qj_swap_nv12(unsigned char* p, int w, int h, size_t avail) {
+    if (!p || w <= 0 || h <= 0) return false;
+    if (p[0] == 0xFF && p[1] == 0xD8) return false;
+    size_t ysz = (size_t)w * (size_t)h;
+    size_t uv = ysz / 2;
+    if (avail < ysz + uv) return false;
+    unsigned char* c = p + ysz;
+    int nz = 0;
+    for (size_t i = 0; i < 256 && i < uv; i++)
+        if (c[i] != 0) nz++;
+    if (nz < 8) return false;
+    pthread_mutex_lock(&g_uv_mu);
+    if (qj_yuv_already((uint64_t)p)) {
+        pthread_mutex_unlock(&g_uv_mu);
+        return false;
+    }
+    for (size_t i = 0; i + 1 < uv; i += 2) {
+        unsigned char t = c[i];
+        c[i] = c[i + 1];
+        c[i + 1] = t;
+    }
+    qj_yuv_remember((uint64_t)p);
+    pthread_mutex_unlock(&g_uv_mu);
+    LOGI("qj-uv swapped NV12 %dx%d at %p avail=%zu", w, h, p, avail);
+    return true;
+}
+
+struct QjJpegErr {
+    jpeg_error_mgr pub;
+    jmp_buf jmp;
+};
+
+static void qj_jpeg_err(j_common_ptr cinfo) {
+    longjmp(reinterpret_cast<QjJpegErr*>(cinfo->err)->jmp, 1);
+}
+
+struct QjJpegApi {
+    jpeg_error_mgr* (*std_error)(jpeg_error_mgr*);
+    void (*CreateDecompress)(j_decompress_ptr, int, size_t);
+    void (*destroy_decompress)(j_decompress_ptr);
+    void (*mem_src)(j_decompress_ptr, const unsigned char*, unsigned long);
+    int (*read_header)(j_decompress_ptr, boolean);
+    int (*start_decompress)(j_decompress_ptr);
+    JDIMENSION (*read_scanlines)(j_decompress_ptr, JSAMPARRAY, JDIMENSION);
+    boolean (*finish_decompress)(j_decompress_ptr);
+    void (*CreateCompress)(j_compress_ptr, int, size_t);
+    void (*destroy_compress)(j_compress_ptr);
+    void (*mem_dest)(j_compress_ptr, unsigned char**, unsigned long*);
+    void (*set_defaults)(j_compress_ptr);
+    void (*set_quality)(j_compress_ptr, int, boolean);
+    void (*start_compress)(j_compress_ptr, boolean);
+    JDIMENSION (*write_scanlines)(j_compress_ptr, JSAMPARRAY, JDIMENSION);
+    void (*finish_compress)(j_compress_ptr);
+    void (*write_marker)(j_compress_ptr, int, const JOCTET*, unsigned int);
+    bool ok;
+};
+
+static QjJpegApi g_j{};
+
+static bool qj_jpeg_bind() {
+    if (g_j.ok) return true;
+    void* h = dlopen("libapsjpeg.so", RTLD_NOW);
+    if (!h) return false;
+#define QJ_DLSYM(sym, field)                                                      \
+    g_j.field = reinterpret_cast<decltype(g_j.field)>(dlsym(h, #sym));            \
+    if (!g_j.field) return false;
+    QJ_DLSYM(jpeg_std_error, std_error);
+    QJ_DLSYM(jpeg_CreateDecompress, CreateDecompress);
+    QJ_DLSYM(jpeg_destroy_decompress, destroy_decompress);
+    QJ_DLSYM(jpeg_mem_src, mem_src);
+    QJ_DLSYM(jpeg_read_header, read_header);
+    QJ_DLSYM(jpeg_start_decompress, start_decompress);
+    QJ_DLSYM(jpeg_read_scanlines, read_scanlines);
+    QJ_DLSYM(jpeg_finish_decompress, finish_decompress);
+    QJ_DLSYM(jpeg_CreateCompress, CreateCompress);
+    QJ_DLSYM(jpeg_destroy_compress, destroy_compress);
+    QJ_DLSYM(jpeg_mem_dest, mem_dest);
+    QJ_DLSYM(jpeg_set_defaults, set_defaults);
+    QJ_DLSYM(jpeg_set_quality, set_quality);
+    QJ_DLSYM(jpeg_start_compress, start_compress);
+    QJ_DLSYM(jpeg_write_scanlines, write_scanlines);
+    QJ_DLSYM(jpeg_finish_compress, finish_compress);
+    QJ_DLSYM(jpeg_write_marker, write_marker);
+#undef QJ_DLSYM
+    g_j.ok = true;
+    LOGI("qj-uv: bound libapsjpeg");
+    return true;
+}
+
+static bool qj_sof(const unsigned char* p, size_t n, int* w, int* h) {
+    if (n < 20 || p[0] != 0xFF || p[1] != 0xD8) return false;
+    size_t i = 2;
+    while (i + 9 < n && p[i] == 0xFF) {
+        unsigned m = p[i + 1];
+        if (m == 0xD8 || m == 0x01 || (m >= 0xD0 && m <= 0xD7)) {
+            i += 2;
+            continue;
+        }
+        if (m == 0xD9) break;
+        size_t seg = 2 + (size_t)((p[i + 2] << 8) | p[i + 3]);
+        if ((m == 0xC0 || m == 0xC1 || m == 0xC2) && i + 8 < n) {
+            *h = (p[i + 5] << 8) | p[i + 6];
+            *w = (p[i + 7] << 8) | p[i + 8];
+            return *w > 0 && *h > 0;
+        }
+        if (seg < 2) break;
+        i += seg;
+        if (m == 0xDA) break;
+    }
+    return false;
+}
+
+static bool qj_has_uv_mark(const unsigned char* p, size_t n) {
+    const size_t ml = sizeof(QJ_UV_MARK) - 1;
+    size_t i = 2;
+    while (i + 4 + ml < n && p[i] == 0xFF) {
+        unsigned m = p[i + 1];
+        if (m == 0xD8 || m == 0x01 || (m >= 0xD0 && m <= 0xD7)) {
+            i += 2;
+            continue;
+        }
+        size_t seg = 2 + (size_t)((p[i + 2] << 8) | p[i + 3]);
+        if (m == 0xFE && seg >= 2 + ml && memcmp(p + i + 4, QJ_UV_MARK, ml) == 0) return true;
+        if (m == 0xDA || m == 0xD9) break;
+        if (seg < 2) break;
+        i += seg;
+    }
+    return false;
+}
+
+static size_t qj_jpeg_len(const unsigned char* p, size_t sz) {
+    size_t cap = sz < (12u << 20) ? sz : (12u << 20);
+    size_t i = 2;
+    while (i + 3 < cap && p[i] == 0xFF) {
+        unsigned m = p[i + 1];
+        if (m == 0xD8 || m == 0x01 || (m >= 0xD0 && m <= 0xD7)) {
+            i += 2;
+            continue;
+        }
+        size_t seg = 2 + (size_t)((p[i + 2] << 8) | p[i + 3]);
+        i += seg;
+        if (m == 0xDA) break;
+    }
+    for (; i + 1 < cap; i++)
+        if (p[i] == 0xFF && p[i + 1] == 0xD9) return i + 2;
+    return cap;
+}
+
+static bool qj_swap_jpeg_uv(unsigned char* p, size_t cap) {
+    if (!qj_jpeg_bind()) return false;
+    size_t n = qj_jpeg_len(p, cap);
+    int w = 0, h = 0;
+    if (!qj_sof(p, n, &w, &h) || !qj_is_quick_wh(w, h) || qj_has_uv_mark(p, n)) return false;
+
+    jpeg_decompress_struct dinfo;
+    memset(&dinfo, 0, sizeof(dinfo));
+    QjJpegErr jerr;
+    memset(&jerr, 0, sizeof(jerr));
+    unsigned char* ycc = nullptr;
+    unsigned char* out = nullptr;
+    unsigned long outn = 0;
+
+    dinfo.err = g_j.std_error(&jerr.pub);
+    jerr.pub.error_exit = qj_jpeg_err;
+    if (setjmp(jerr.jmp)) {
+        g_j.destroy_decompress(&dinfo);
+        free(ycc);
+        free(out);
+        return false;
+    }
+    g_j.CreateDecompress(&dinfo, JPEG_LIB_VERSION, sizeof(dinfo));
+    g_j.mem_src(&dinfo, p, (unsigned long)n);
+    g_j.read_header(&dinfo, TRUE);
+    dinfo.out_color_space = JCS_YCbCr;
+    g_j.start_decompress(&dinfo);
+    int stride = (int)dinfo.output_width * (int)dinfo.output_components;
+    ycc = (unsigned char*)malloc((size_t)stride * dinfo.output_height);
+    if (!ycc) longjmp(jerr.jmp, 1);
+    JSAMPROW rowptr[1];
+    while (dinfo.output_scanline < dinfo.output_height) {
+        rowptr[0] = ycc + (size_t)dinfo.output_scanline * (size_t)stride;
+        g_j.read_scanlines(&dinfo, rowptr, 1);
+    }
+    g_j.finish_decompress(&dinfo);
+    g_j.destroy_decompress(&dinfo);
+
+    size_t pix = (size_t)w * (size_t)h;
+    for (size_t i = 0; i < pix; i++) {
+        unsigned char t = ycc[i * 3 + 1];
+        ycc[i * 3 + 1] = ycc[i * 3 + 2];
+        ycc[i * 3 + 2] = t;
+    }
+
+    jpeg_compress_struct cinfo;
+    memset(&cinfo, 0, sizeof(cinfo));
+    QjJpegErr cerr;
+    memset(&cerr, 0, sizeof(cerr));
+    cinfo.err = g_j.std_error(&cerr.pub);
+    cerr.pub.error_exit = qj_jpeg_err;
+    if (setjmp(cerr.jmp)) {
+        g_j.destroy_compress(&cinfo);
+        free(ycc);
+        free(out);
+        return false;
+    }
+    g_j.CreateCompress(&cinfo, JPEG_LIB_VERSION, sizeof(cinfo));
+    g_j.mem_dest(&cinfo, &out, &outn);
+    cinfo.image_width = (JDIMENSION)w;
+    cinfo.image_height = (JDIMENSION)h;
+    cinfo.input_components = 3;
+    cinfo.in_color_space = JCS_YCbCr;
+    g_j.set_defaults(&cinfo);
+    g_j.set_quality(&cinfo, 90, TRUE);
+    g_j.start_compress(&cinfo, TRUE);
+    g_j.write_marker(&cinfo, JPEG_COM, reinterpret_cast<const JOCTET*>(QJ_UV_MARK),
+                     sizeof(QJ_UV_MARK) - 1);
+    while (cinfo.next_scanline < cinfo.image_height) {
+        rowptr[0] = ycc + (size_t)cinfo.next_scanline * (size_t)stride;
+        g_j.write_scanlines(&cinfo, rowptr, 1);
+    }
+    g_j.finish_compress(&cinfo);
+    g_j.destroy_compress(&cinfo);
+    free(ycc);
+    if (!out || outn < 4 || outn + 2 > cap) {
+        free(out);
+        return false;
+    }
+    memcpy(p, out, outn);
+    if (n > outn) memset(p + outn, 0xFF, n - outn);
+    free(out);
+    LOGI("qj-uv swapped %dx%d jpeg %zu -> %lu", w, h, n, outn);
+    return true;
+}
+
+// qj_swap_at: this pointer only. Size-gate so we do not read GPU dmabufs
+// that happen to be children of an AlgoProcess object.
+static int qj_swap_at(void* p) {
+    p = qj_untag(p);
+    if (!p) return 0;
+    uint64_t b = 0, s = 0;
+    if (!range_of((uint64_t)p, &b, &s)) return 0;
+    size_t avail = (size_t)(s - ((uint64_t)p - b));
+    if (avail < 64) return 0;
+    auto* q = reinterpret_cast<unsigned char*>(p);
+    if (qj_looks_quick_yuv(avail) || qj_looks_quick_yuv(s))
+        return qj_swap_nv12(q, 1280, 960, avail) ? 1 : 0;
+    // Thumbnail JPEG only (not the 24MB still BLOB, not a giant GPU mapping).
+    if (avail >= 64 && avail <= (2u << 20) && q[0] == 0xFF && q[1] == 0xD8 && q[2] == 0xFF) {
+        int w = 0, h = 0;
+        if (qj_sof(q, avail < (2u << 20) ? avail : (2u << 20), &w, &h) && qj_is_quick_wh(w, h)) {
+            pthread_mutex_lock(&g_uv_mu);
+            bool ok = qj_swap_jpeg_uv(q, avail);
+            pthread_mutex_unlock(&g_uv_mu);
+            return ok ? 1 : 0;
+        }
+    }
+    return 0;
+}
+
+static int qj_swap_obj(void* obj, int nwords) {
+    obj = qj_untag(obj);
+    if (!obj || nwords <= 0) return 0;
+    uint64_t b = 0, s = 0;
+    if (!range_of((uint64_t)obj, &b, &s)) return 0;
+    int n = qj_swap_at(obj);
+    size_t max = (size_t)(s - ((uint64_t)obj - b)) / sizeof(void*);
+    if (max > (size_t)nwords) max = (size_t)nwords;
+    auto** w = reinterpret_cast<void**>(obj);
+    for (size_t i = 0; i < max; i++) n += qj_swap_at(w[i]);
+    return n;
+}
+
+// Exact-size 1280x960 YUV only. Those sizes are linear NV12, including dmabuf.
+static int qj_swap_yuv_sized() {
+    FILE* f = fopen("/proc/self/maps", "re");
+    if (!f) return 0;
+    char line[512];
+    int n = 0;
+    while (fgets(line, sizeof(line), f)) {
+        unsigned long long lo = 0, hi = 0;
+        char perms[8] = {0};
+        if (sscanf(line, "%llx-%llx %7s", &lo, &hi, perms) != 3) continue;
+        if (perms[0] != 'r' || perms[1] != 'w') continue;
+        size_t sz = (size_t)(hi - lo);
+        if (!qj_looks_quick_yuv(sz)) continue;
+        auto* p = reinterpret_cast<unsigned char*>(static_cast<uintptr_t>(lo));
+        if (qj_swap_nv12(p, 1280, 960, sz)) n++;
+    }
+    fclose(f);
+    return n;
+}
+
+typedef int (*proc_req_t)(void*, bool, void**, void*, int, int);
+static proc_req_t g_real_proc_req = nullptr;
+static bool g_proc_req_hooked = false;
+
+static int wrap_proc_req(void* self, bool flag, void** bufs, void* a3, int w, int h) {
+    int rc = g_real_proc_req(self, flag, bufs, a3, w, h);
+    if (qj_is_quick_wh(w, h)) {
+        int n = qj_swap_obj(bufs, 16) + qj_swap_obj(a3, 16);
+        if (!n) n = qj_swap_yuv_sized();
+        LOGI(n ? "qj-uv after processOfflineRequest swapped %d"
+               : "qj-uv after processOfflineRequest found no buffer",
+             n);
+    }
+    return rc;
+}
+
+// d is NOT a reliable "quick vs final" flag (live shots log d=0 on Quick JPEG).
+typedef int (*hwjpeg_t)(void*, void*, int, unsigned char, int, int);
+static hwjpeg_t g_real_hwjpeg = nullptr;
+static bool g_hwjpeg_hooked = false;
+
+static int wrap_hwjpeg(void* data, void* buf, int a, unsigned char b, int c, int d) {
+    int n = qj_swap_obj(buf, 16) + qj_swap_obj(data, 16);
+    if (!n) n = qj_swap_yuv_sized();
+    if (n) LOGI("qj-uv before hwJpegEncodec swapped %d (d=%d)", n, d);
+    int rc = g_real_hwjpeg(data, buf, a, b, c, d);
+    // Encode output may be the 960x1280 JPEG. Swap that one pointer only.
+    int m = qj_swap_at(buf) + qj_swap_at(data);
+    if (m) LOGI("qj-uv after hwJpegEncodec swapped %d jpeg/yuv", m);
+    return rc;
+}
+
+typedef int (*dumpqj_t)(void*, void*, int);
+static dumpqj_t g_real_dumpqj = nullptr;
+static bool g_dumpqj_hooked = false;
+
+static int wrap_dumpqj(void* self, void* data, int n) {
+    int rc = g_real_dumpqj(self, data, n);
+    // File only. The first on-screen frame may already have been painted
+    // from YUV; this keeps the cache and any late decode in sync.
+    // Use nftw-less: try the newest names via a dir fd + getdents is messy
+    // without dirent.h — open common path if we can find it via maps? Skip
+    // the dir walk; qj_swap_at on `data` covers the in-memory JPEG.
+    qj_swap_obj(data, 16);
+    return rc;
+}
+
+static void write_abs_jump(void* at, void* dest) {
+    uint32_t* i = (uint32_t*)at;
+    i[0] = 0x58000050;
+    i[1] = 0xd61f0200;
+    memcpy(i + 2, &dest, sizeof(dest));
+}
+
+static bool hook_one(const char* name, void* wrap, void** real_out, bool* done) {
+    if (*done) return true;
+    void* h = dlopen("libAlgoProcess.so", RTLD_NOLOAD);
+    if (!h) h = dlopen("libAlgoProcess.so", RTLD_NOW);
+    if (!h) return false;
+    void* target = dlsym(h, name);
+    if (!target) {
+        LOGW("%s not found", name);
+        return false;
+    }
+    uint8_t* thunk = (uint8_t*)mmap(nullptr, 4096, PROT_READ | PROT_WRITE | PROT_EXEC,
+                                    MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if (thunk == MAP_FAILED) return false;
+    memcpy(thunk, target, 16);
+    write_abs_jump(thunk + 16, (char*)target + 16);
+    *real_out = thunk;
+
+    uintptr_t page = (uintptr_t)target & ~(uintptr_t)0xfff;
+    if (mprotect((void*)page, 0x2000, PROT_READ | PROT_WRITE | PROT_EXEC) != 0) return false;
+    write_abs_jump(target, wrap);
+    __builtin___clear_cache((char*)target, (char*)target + 16);
+    *done = true;
+    LOGI("hooked %s (%p)", name, target);
+    return true;
+}
+
+static bool hook_proc_req() {
+    return hook_one(
+        "_ZN6vendor3qti8hardware6camera13offlinecamera14implementation19OfflineCameraClient21"
+        "processOfflineRequestEbPPvS6_ii",
+        (void*)wrap_proc_req, (void**)&g_real_proc_req, &g_proc_req_hooked);
+}
+
+static bool hook_hwjpeg() {
+    return hook_one("_ZN7android13hwJpegEncodecEPNS_15AlgoProcessDataEPvihii",
+                    (void*)wrap_hwjpeg, (void**)&g_real_hwjpeg, &g_hwjpeg_hooked);
+}
+
+static bool hook_dumpqj() {
+    return hook_one(
+        "_ZN20APSRefFrameProcessor19dumpQuickJpegIfNeedEPN7android15AlgoProcessDataEi",
+        (void*)wrap_dumpqj, (void**)&g_real_dumpqj, &g_dumpqj_hooked);
+}
+
 static void try_install() {
     uint64_t base;
 
@@ -607,6 +1040,9 @@ static void try_install() {
                   &g_dlsym_iface_got);
     hook_dlsym_in("libAlgoProcess.so", 0x800000, &g_dlsym_proc_done, &g_dlsym_proc_found,
                   &g_dlsym_proc_got);
+    hook_proc_req();
+    hook_hwjpeg();
+    hook_dumpqj();
     patch_cached_tfrsn();
 }
 
@@ -615,8 +1051,8 @@ static void* poller(void*) {
         try_install();
         uint64_t fusion = 0;
         bool have_fusion = module_base("libarcsoft_turbo_fusion_raw_super_night.so", &fusion);
-        if (g_p010_done && g_dlsym_iface_done && g_dlsym_proc_done &&
-            (g_tfrsn_patched || (!have_fusion && i > 200)))
+        if (g_p010_done && g_dlsym_iface_done && g_dlsym_proc_done && g_proc_req_hooked &&
+            g_hwjpeg_hooked && (g_tfrsn_patched || (!have_fusion && i > 200)))
             break;
         usleep(25 * 1000);
     }
@@ -627,7 +1063,7 @@ static void* poller(void*) {
 }
 
 __attribute__((constructor)) static void apsfixup_init() {
-    LOGI("libapsfixup loaded (pid %d) RAW/HDR wrap, TFRSN cache patch, no RAW_Bokeh", getpid());
+    LOGI("libapsfixup loaded (pid %d) RAW/HDR wrap, TFRSN, qj-uv", getpid());
     try_install();
     pthread_t t;
     pthread_create(&t, nullptr, poller, nullptr);
