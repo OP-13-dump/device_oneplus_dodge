@@ -66,45 +66,44 @@ public class KeyHandler implements DeviceKeyHandler {
             Log.i(TAG, "update usage " + usage + " with actions " +
                     Arrays.toString(actions));
 
-            if (mSliderController != null) {
-                mSliderController.reset();
-            }
+            SliderControllerBase oldController = mSliderController;
+            SliderControllerBase newController;
 
             switch (usage) {
                 case NotificationController.ID:
-                    mSliderController = mNotificationController;
-                    mSliderController.update(actions);
+                    newController = mNotificationController;
                     break;
                 case FlashlightController.ID:
-                    mSliderController = mFlashlightController;
-                    mSliderController.update(actions);
+                    newController = mFlashlightController;
                     break;
                 case BrightnessController.ID:
-                    mSliderController = mBrightnessController;
-                    mSliderController.update(actions);
+                    newController = mBrightnessController;
                     break;
                 case RotationController.ID:
-                    mSliderController = mRotationController;
-                    mSliderController.update(actions);
+                    newController = mRotationController;
                     break;
                 case RingerController.ID:
-                    mSliderController = mRingerController;
-                    mSliderController.update(actions);
+                    newController = mRingerController;
                     break;
                 case NotificationRingerController.ID:
-                    mSliderController = mNotificationRingerController;
-                    mSliderController.update(actions);
+                    newController = mNotificationRingerController;
                     break;
                 case AppLaunchController.ID:
                     mAppLaunchController.updatePackages(
                             intent.getStringArrayExtra(Constants.EXTRA_SLIDER_APPS));
-                    mSliderController = mAppLaunchController;
-                    mSliderController.update(actions);
+                    newController = mAppLaunchController;
                     break;
                 default:
                     Log.w(TAG, "Unknown slider usage: " + usage);
                     return;
             }
+
+            if (oldController != null && oldController != newController) {
+                oldController.reset();
+            }
+
+            mSliderController = newController;
+            mSliderController.update(actions);
 
             // Don't "restore" the app-launch usage: that would open an app
             // on every settings change and on boot instead of only on a
