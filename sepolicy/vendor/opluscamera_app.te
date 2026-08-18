@@ -1,0 +1,4 @@
+# libapsfixup calls __system_property_set() on vendor.camera.arcsoft.tfrsn.bypass
+# from the camera process. The blob policy grants only get_prop, so every set was
+# denied and the TFRSN bypass never applied.
+set_prop(opluscamera_app, vendor_camera_prop)
