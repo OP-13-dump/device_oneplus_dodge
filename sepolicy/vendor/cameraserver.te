@@ -1,0 +1,2 @@
+# cameraserver raises the priority of its client's capture threads.
+allow cameraserver opluscamera_app:process setsched;
