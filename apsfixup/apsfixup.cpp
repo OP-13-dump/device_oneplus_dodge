@@ -35,6 +35,7 @@
 #include <link.h>
 #include <pthread.h>
 #include <setjmp.h>
+#include <signal.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -55,7 +56,8 @@
 
 static const uint64_t MIN_SNAPSHOT = 0x400000;
 
-static bool range_of(uint64_t addr, uint64_t* out_base, uint64_t* out_size) {
+static bool range_of_perms(uint64_t addr, uint64_t* out_base, uint64_t* out_size,
+                           char* out_perms) {
     int fd = open("/proc/self/maps", O_RDONLY | O_CLOEXEC);
     if (fd < 0) return false;
 
@@ -63,6 +65,8 @@ static bool range_of(uint64_t addr, uint64_t* out_base, uint64_t* out_size) {
     ssize_t bytes;
     uint64_t lo = 0, hi = 0;
     int state = 0;
+    char perms[5] = {0};
+    int pn = 0;
 
     while ((bytes = read(fd, buf, sizeof(buf))) > 0) {
         for (ssize_t i = 0; i < bytes; i++) {
@@ -73,12 +77,11 @@ static bool range_of(uint64_t addr, uint64_t* out_base, uint64_t* out_size) {
             } else if (state == 1) {
                 if (c == ' ') {
                     if (addr >= lo && addr < hi) {
-                        *out_base = lo;
-                        *out_size = hi - lo;
-                        close(fd);
-                        return true;
+                        state = 3;
+                        pn = 0;
+                    } else {
+                        state = 2;
                     }
-                    state = 2;
                 } else {
                     hi = (hi << 4) | (c <= '9' ? c - '0' : (c & 0xDF) - 'A' + 10);
                 }
@@ -88,11 +91,24 @@ static bool range_of(uint64_t addr, uint64_t* out_base, uint64_t* out_size) {
                     lo = 0;
                     hi = 0;
                 }
+            } else {
+                perms[pn++] = c;
+                if (pn == 4) {
+                    *out_base = lo;
+                    *out_size = hi - lo;
+                    if (out_perms) memcpy(out_perms, perms, 5);
+                    close(fd);
+                    return true;
+                }
             }
         }
     }
     close(fd);
     return false;
+}
+
+static bool range_of(uint64_t addr, uint64_t* out_base, uint64_t* out_size) {
+    return range_of_perms(addr, out_base, out_size, nullptr);
 }
 
 static bool module_base(const char* name, uint64_t* out_base) {
@@ -578,6 +594,76 @@ static void patch_cached_tfrsn() {
     }
 }
 
+// ---- fault guard ---------------------------------------------------------
+// A dmabuf can be unmapped by the pipeline between the /proc/self/maps read and
+// the touch, which faults SEGV_MAPERR on a page boundary and kills the capture
+// thread (apsRoutine). Survive that one swap; anything outside the buffer we are
+// touching goes to the handler that was installed before us.
+
+static pthread_mutex_t g_uv_mu = PTHREAD_MUTEX_INITIALIZER;
+static __thread bool g_uv_held = false;
+
+static void qj_uv_lock() {
+    pthread_mutex_lock(&g_uv_mu);
+    g_uv_held = true;
+}
+
+static void qj_uv_unlock() {
+    g_uv_held = false;
+    pthread_mutex_unlock(&g_uv_mu);
+}
+
+struct QjGuard {
+    sigjmp_buf jmp;
+    uintptr_t lo, hi;
+    bool armed;
+};
+
+static __thread QjGuard g_qj_guard;
+static struct sigaction g_qj_old_segv, g_qj_old_bus;
+
+static void qj_fault(int sig, siginfo_t* si, void*) {
+    QjGuard* g = &g_qj_guard;
+    uintptr_t a = reinterpret_cast<uintptr_t>(si->si_addr);
+    if (g->armed && a >= g->lo && a < g->hi) {
+        g->armed = false;
+        siglongjmp(g->jmp, 1);
+    }
+    sigaction(sig, sig == SIGBUS ? &g_qj_old_bus : &g_qj_old_segv, nullptr);
+}
+
+// Called from try_install(). Breakpad installs its handler after we load, so
+// reclaim the front of the chain instead of installing once and being buried.
+static void qj_guard_refresh() {
+    struct sigaction cur;
+    if (sigaction(SIGSEGV, nullptr, &cur) == 0 && (cur.sa_flags & SA_SIGINFO) &&
+        cur.sa_sigaction == qj_fault)
+        return;
+    struct sigaction sa;
+    memset(&sa, 0, sizeof(sa));
+    sa.sa_sigaction = qj_fault;
+    sa.sa_flags = SA_SIGINFO | SA_ONSTACK | SA_NODEFER;
+    sigemptyset(&sa.sa_mask);
+    sigaction(SIGSEGV, &sa, &g_qj_old_segv);
+    sigaction(SIGBUS, &sa, &g_qj_old_bus);
+}
+
+#define QJ_GUARDED(lo_, hi_, ...)                                    \
+    do {                                                             \
+        QjGuard* g__ = &g_qj_guard;                                  \
+        g__->lo = (uintptr_t)(lo_);                                  \
+        g__->hi = (uintptr_t)(hi_);                                  \
+        if (sigsetjmp(g__->jmp, 1) == 0) {                           \
+            g__->armed = true;                                       \
+            __VA_ARGS__;                                             \
+        } else {                                                     \
+            if (g_uv_held) qj_uv_unlock();                           \
+            LOGW("qj-uv guarded fault in [%p,%p)", (void*)g__->lo,   \
+                 (void*)g__->hi);                                    \
+        }                                                            \
+        g__->armed = false;                                          \
+    } while (0)
+
 // ---- Quick JPEG U/V swap -------------------------------------------------
 // Photo-mode Quick JPEG 1280x960 NV12 (and the 960x1280 JPEG made from it)
 // is a perfect Cb/Cr swap vs the APS final. Swap the YUV before encode, and
@@ -602,7 +688,6 @@ static bool qj_looks_quick_yuv(size_t sz) {
 
 #define QJ_UV_MARK "APSFIXUP-UV1"
 
-static pthread_mutex_t g_uv_mu = PTHREAD_MUTEX_INITIALIZER;
 static uint64_t g_yuv_done[32]{};
 static int g_yuv_n = 0;
 
@@ -628,9 +713,9 @@ static bool qj_swap_nv12(unsigned char* p, int w, int h, size_t avail) {
     for (size_t i = 0; i < 256 && i < uv; i++)
         if (c[i] != 0) nz++;
     if (nz < 8) return false;
-    pthread_mutex_lock(&g_uv_mu);
+    qj_uv_lock();
     if (qj_yuv_already((uint64_t)p)) {
-        pthread_mutex_unlock(&g_uv_mu);
+        qj_uv_unlock();
         return false;
     }
     for (size_t i = 0; i + 1 < uv; i += 2) {
@@ -639,7 +724,7 @@ static bool qj_swap_nv12(unsigned char* p, int w, int h, size_t avail) {
         c[i + 1] = t;
     }
     qj_yuv_remember((uint64_t)p);
-    pthread_mutex_unlock(&g_uv_mu);
+    qj_uv_unlock();
     LOGI("qj-uv swapped NV12 %dx%d at %p avail=%zu", w, h, p, avail);
     return true;
 }
@@ -857,23 +942,29 @@ static int qj_swap_at(void* p) {
     p = qj_untag(p);
     if (!p) return 0;
     uint64_t b = 0, s = 0;
-    if (!range_of((uint64_t)p, &b, &s)) return 0;
+    char perms[5] = {0};
+    if (!range_of_perms((uint64_t)p, &b, &s, perms)) return 0;
+    // Never write through a PROT_NONE guard page or a read-only mapping.
+    if (perms[0] != 'r' || perms[1] != 'w') return 0;
     size_t avail = (size_t)(s - ((uint64_t)p - b));
     if (avail < 64) return 0;
     auto* q = reinterpret_cast<unsigned char*>(p);
-    if (qj_looks_quick_yuv(avail) || qj_looks_quick_yuv(s))
-        return qj_swap_nv12(q, 1280, 960, avail) ? 1 : 0;
-    // Thumbnail JPEG only (not the 24MB still BLOB, not a giant GPU mapping).
-    if (avail >= 64 && avail <= (2u << 20) && q[0] == 0xFF && q[1] == 0xD8 && q[2] == 0xFF) {
-        int w = 0, h = 0;
-        if (qj_sof(q, avail < (2u << 20) ? avail : (2u << 20), &w, &h) && qj_is_quick_wh(w, h)) {
-            pthread_mutex_lock(&g_uv_mu);
-            bool ok = qj_swap_jpeg_uv(q, avail);
-            pthread_mutex_unlock(&g_uv_mu);
-            return ok ? 1 : 0;
+    int n = 0;
+    QJ_GUARDED(b, b + s, {
+        if (qj_looks_quick_yuv(avail) || qj_looks_quick_yuv(s)) {
+            n = qj_swap_nv12(q, 1280, 960, avail) ? 1 : 0;
+        } else if (avail <= (2u << 20) && q[0] == 0xFF && q[1] == 0xD8 && q[2] == 0xFF) {
+            // Thumbnail JPEG only (not the 24MB still BLOB, not a giant GPU mapping).
+            int w = 0, h = 0;
+            if (qj_sof(q, avail, &w, &h) && qj_is_quick_wh(w, h)) {
+                qj_uv_lock();
+                bool ok = qj_swap_jpeg_uv(q, avail);
+                qj_uv_unlock();
+                n = ok ? 1 : 0;
+            }
         }
-    }
-    return 0;
+    });
+    return n;
 }
 
 static int qj_swap_obj(void* obj, int nwords) {
@@ -885,7 +976,11 @@ static int qj_swap_obj(void* obj, int nwords) {
     size_t max = (size_t)(s - ((uint64_t)obj - b)) / sizeof(void*);
     if (max > (size_t)nwords) max = (size_t)nwords;
     auto** w = reinterpret_cast<void**>(obj);
-    for (size_t i = 0; i < max; i++) n += qj_swap_at(w[i]);
+    for (size_t i = 0; i < max; i++) {
+        void* v = nullptr;
+        QJ_GUARDED(b, b + s, { v = w[i]; });
+        if (v) n += qj_swap_at(v);
+    }
     return n;
 }
 
@@ -896,14 +991,23 @@ static int qj_swap_yuv_sized() {
     char line[512];
     int n = 0;
     while (fgets(line, sizeof(line), f)) {
-        unsigned long long lo = 0, hi = 0;
-        char perms[8] = {0};
-        if (sscanf(line, "%llx-%llx %7s", &lo, &hi, perms) != 3) continue;
+        unsigned long long lo = 0, hi = 0, off = 0, ino = 0;
+        char perms[8] = {0}, dev[16] = {0}, path[256] = {0};
+        int nf = sscanf(line, "%llx-%llx %7s %llx %15s %llu %255s", &lo, &hi, perms, &off, dev,
+                        &ino, path);
+        if (nf < 6) continue;
         if (perms[0] != 'r' || perms[1] != 'w') continue;
         size_t sz = (size_t)(hi - lo);
         if (!qj_looks_quick_yuv(sz)) continue;
+        // Anonymous / dmabuf only. A mapped file that happens to be exactly this
+        // size is not our buffer, and writing it corrupts whoever owns it.
+        if (nf == 7 && path[0] == '/' && strncmp(path, "/dmabuf", 7) != 0 &&
+            strncmp(path, "/memfd:", 7) != 0)
+            continue;
         auto* p = reinterpret_cast<unsigned char*>(static_cast<uintptr_t>(lo));
-        if (qj_swap_nv12(p, 1280, 960, sz)) n++;
+        QJ_GUARDED(lo, hi, {
+            if (qj_swap_nv12(p, 1280, 960, sz)) n++;
+        });
     }
     fclose(f);
     return n;
@@ -1044,6 +1148,7 @@ static void try_install() {
     hook_hwjpeg();
     hook_dumpqj();
     patch_cached_tfrsn();
+    qj_guard_refresh();
 }
 
 static void* poller(void*) {
