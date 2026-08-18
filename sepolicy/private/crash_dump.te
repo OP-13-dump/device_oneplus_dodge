@@ -1,0 +1,3 @@
+# /proc/<pid>/maps is served from a memfd on this build, so crash_dump cannot
+# write it and native crashes produce no tombstone.
+allow crash_dump tmpfs:file write;

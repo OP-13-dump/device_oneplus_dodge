@@ -1,2 +1,5 @@
 # Allow PermissionController to find QSPM HAL service
 allow permissioncontroller_app vendor_hal_qspmhal_hwservice:hwservice_manager find;
+
+# QSPM is AIDL here; the hwservice rule above never matches.
+allow permissioncontroller_app vendor_hal_qspmhal_service:service_manager find;
