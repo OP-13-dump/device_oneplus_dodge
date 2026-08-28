@@ -29,6 +29,7 @@ import org.lineageos.device.settings.display.DisplayModeController;
 import org.lineageos.device.settings.display.HbmController;
 import org.lineageos.device.settings.display.PwmController;
 import org.lineageos.device.settings.display.SunlightBoostController;
+import org.lineageos.device.settings.fastcharge.FastChargeController;
 import org.lineageos.device.settings.gamebar.GameBar;
 import org.lineageos.device.settings.gamebar.GameBarMonitorService;
 import org.lineageos.device.settings.refreshrate.RefreshRateController;
@@ -75,6 +76,7 @@ public class DeviceSettingsService extends Service {
 
     private void initializeSubsystems() {
         initializeBypassCharging();
+        initializeFastCharging();
         initializePwm();
         initializeTestTe();
         initializeSunlightBoost();
@@ -103,6 +105,18 @@ public class DeviceSettingsService extends Service {
             if (Constants.DEBUG) Log.i(TAG, "BypassCharging initialized");
         } catch (Exception e) {
             Log.e(TAG, "Failed to initialize BypassCharging", e);
+        }
+    }
+
+    private void initializeFastCharging() {
+        if (Constants.DEBUG) Log.i(TAG, "Initializing FastCharging");
+        try {
+            // USER_VOTER does not survive a reboot, so the persisted cap has to be
+            // written again here
+            FastChargeController.getInstance(this).restore();
+            if (Constants.DEBUG) Log.i(TAG, "FastCharging initialized");
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to initialize FastCharging", e);
         }
     }
 
@@ -309,6 +323,12 @@ public class DeviceSettingsService extends Service {
         } catch (Exception e) {
             Log.e(TAG, "Failed to handle power connected", e);
         }
+
+        try {
+            FastChargeController.getInstance(this).restore();
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to restore fast charging on connect", e);
+        }
     }
 
     private void handlePowerDisconnected() {
@@ -321,6 +341,14 @@ public class DeviceSettingsService extends Service {
             BypassChargingController.getInstance(this).handlePowerDisconnected();
         } catch (Exception e) {
             Log.e(TAG, "Failed to handle power disconnected", e);
+        }
+
+        // USER_VOTER survives unplug, so clear the session boost and re-apply the
+        // persisted cap now for the next plug
+        try {
+            FastChargeController.getInstance(this).restore();
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to restore fast charging on disconnect", e);
         }
     }
 }
