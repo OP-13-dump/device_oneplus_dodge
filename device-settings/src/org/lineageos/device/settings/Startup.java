@@ -19,6 +19,9 @@ package org.lineageos.device.settings;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
+import org.lineageos.device.settings.fastcharge.FastChargeController;
+import org.lineageos.internal.util.FileUtils;
 
 public class Startup extends BroadcastReceiver {
 
@@ -29,7 +32,7 @@ public class Startup extends BroadcastReceiver {
         final String action = intent.getAction();
         if (lineageos.content.Intent.ACTION_INITIALIZE_LINEAGE_HARDWARE.equals(action)) {
             DeviceSettings.restoreSliderStates(context);
-            // DeviceSettings.restoreFastChargeSetting(context);
+            FastChargeController.getInstance(context).restore();
         }
     }
 }
