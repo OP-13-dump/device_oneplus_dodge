@@ -114,6 +114,31 @@ public class Constants {
     public static final int BYPASS_TARGET_MAX = 99;
     public static final int BYPASS_TARGET_DEFAULT = BYPASS_TARGET_MIN;
 
+    /* Fast charging current cap */
+    public static final String NODE_FAST_CHARGING = "/sys/class/oplus_chg/battery/cool_down";
+    public static final String KEY_FAST_CHARGING = "fast_charging";
+    public static final String KEY_NIGHT_CHARGING = "night_charging";
+
+    /** cool_down steps on svooc_2_0_curr_table (Ibus mA), DT vooc_curr_table_type=2.
+     *  0 unvotes USER_VOTER entirely: the 9.5 A / 100 W brick class. */
+    public static final String COOL_DOWN_UNLIMITED = "0";
+    public static final String COOL_DOWN_NIGHT = "1";      // 1500 mA
+    public static final String COOL_DOWN_STANDARD = "5";   // 3000 mA
+
+    /** Mirrored to Settings.System for the SystemUI charging HUD, which must not
+     *  read oplus_chg itself (platform_app is denied search on that dir). */
+    public static final String SETTINGS_CHARGE_HUD_MODE = "device_settings_charge_hud_mode";
+    public static final String SETTINGS_CHARGE_BOOST_AVAILABLE =
+            "device_settings_charge_boost_available";
+
+    public static final int HUD_MODE_UNLIMITED = 0;
+    public static final int HUD_MODE_STANDARD = 1;
+    public static final int HUD_MODE_NIGHT = 2;
+
+    /** Sent by SystemUI on long-press inside the charging ring. */
+    public static final String ACTION_BOOST_CHARGING =
+            "org.lineageos.device.settings.action.BOOST_CHARGING";
+
     /* HBM */
     public static final String NODE_HBM = "/sys/kernel/oplus_display/hbm_max";
     public static final String KEY_HBM = "hbm_max";

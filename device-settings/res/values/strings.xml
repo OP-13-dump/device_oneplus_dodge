@@ -59,6 +59,13 @@
     <string name="gaming_category_title">Gaming</string>
     <string name="gaming_category_summary">Extra settings for gamers</string>
 
+    <!-- Battery category -->
+    <string name="battery_category_title">Battery</string>
+    <string name="fast_charging_title">Fast charging</string>
+    <string name="fast_charging_summary">Allow SuperVOOC up to 100W</string>
+    <string name="night_charging_title">Night mode</string>
+    <string name="night_charging_summary">Limit charging current to 1.5A</string>
+
     <!-- Bypass chargings -->
     <string name="bypass_charging_category_title" translatable="false">@string/bypass_charging_title</string>
     <string name="bypass_charging_title">Bypass charging</string>

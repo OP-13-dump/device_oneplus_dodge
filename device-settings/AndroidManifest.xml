@@ -33,6 +33,7 @@
     <protected-broadcast android:name="org.lineageos.device.settings.UPDATE_SLIDER_SETTINGS" />
     <protected-broadcast android:name="org.lineageos.device.settings.UPDATE_SLIDER_POSITION" />
     <protected-broadcast android:name="org.lineageos.device.settings.action.DISPLAY_MODE_CHANGED" />
+    <protected-broadcast android:name="org.lineageos.device.settings.action.BOOST_CHARGING" />
 
     <application
         android:icon="@drawable/ic_logo"
@@ -130,6 +131,15 @@
                 android:name="com.android.settings.summary"
                 android:resource="@string/bypass_charging_summary" />
         </activity>
+
+        <!-- Charging boost from the SystemUI charging ring -->
+        <receiver android:name=".fastcharge.FastChargeBoostReceiver"
+            android:permission="android.permission.STATUS_BAR_SERVICE"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="org.lineageos.device.settings.action.BOOST_CHARGING" />
+            </intent-filter>
+        </receiver>
 
         <!-- Bypass charging manager -->
         <service
