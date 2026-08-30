@@ -134,6 +134,9 @@ PRODUCT_PRODUCT_PROPERTIES += \
 # Inherit from the common OEM chipset makefile.
 $(call inherit-product, device/oneplus/sm8750-common/common.mk)
 
+# Dalvik: 16GB. Must follow the common inherit; ?= props are last-wins.
+$(call inherit-product, frameworks/native/build/phone-xhdpi-16384-dalvik-heap.mk)
+
 # Real-time 1080p120: override the stock odm camera feature blob.
 # This has to be declared *before* inheriting dodge-vendor.mk. inherit-product
 # only appends an @inherit: marker that gets expanded after this file is parsed,
