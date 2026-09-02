@@ -54,25 +54,24 @@ public class HbmTile extends TileService {
             return;
         }
 
-        // Immediately update tile to new state for instant feedback
+        // Instant visual feedback; work (incl. settle sleep) runs off the main thread
         boolean targetState = !currentState;
         updateTileImmediate(targetState, pwmEnabled);
 
-        // Then perform the actual operation
-        boolean success;
-        if (currentState) {
-            success = mController.disableHbm();
-        } else {
-            success = mController.enableHbm();
-        }
-
-        // If operation failed, revert to actual state
-        if (!success) {
-            Log.w(TAG, "HBM toggle failed, reverting tile state");
-            updateTile();
-        } else {
-            if (Constants.DEBUG) Log.i(TAG, "HBM toggled to: " + targetState);
-        }
+        final boolean turningOff = currentState;
+        new Thread(() -> {
+            boolean success = turningOff
+                    ? mController.disableHbm()
+                    : mController.enableHbm();
+            getMainExecutor().execute(() -> {
+                if (!success) {
+                    Log.w(TAG, "HBM toggle failed, reverting tile state");
+                } else if (Constants.DEBUG) {
+                    Log.i(TAG, "HBM toggled to: " + targetState);
+                }
+                updateTile();
+            });
+        }, "HbmTile-toggle").start();
     }
 
     /**
