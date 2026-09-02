@@ -46,25 +46,24 @@ public class PwmTile extends TileService {
     public void onClick() {
         boolean currentState = mController.isPwmEnabled();
 
-        // Immediately update tile to new state for instant feedback
-        boolean targetState = ! currentState;
+        // Instant visual feedback; work (incl. settle sleep) runs off the main thread
+        boolean targetState = !currentState;
         updateTileImmediate(targetState);
 
-        // Then perform the actual operation
-        boolean success;
-        if (currentState) {
-            success = mController.disablePwm();
-        } else {
-            success = mController.enablePwm();
-        }
-
-        // If operation failed, revert to actual state
-        if (!success) {
-            Log.w(TAG, "PWM toggle failed, reverting tile state");
-            updateTile();
-        } else {
-            if (Constants.DEBUG) Log.i(TAG, "PWM toggled to: " + targetState);
-        }
+        final boolean turningOff = currentState;
+        new Thread(() -> {
+            boolean success = turningOff
+                    ? mController.disablePwm()
+                    : mController.enablePwm();
+            getMainExecutor().execute(() -> {
+                if (!success) {
+                    Log.w(TAG, "PWM toggle failed, reverting tile state");
+                } else if (Constants.DEBUG) {
+                    Log.i(TAG, "PWM toggled to: " + targetState);
+                }
+                updateTile();
+            });
+        }, "PwmTile-toggle").start();
     }
 
     /**
