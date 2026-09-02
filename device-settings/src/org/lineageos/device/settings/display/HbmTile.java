@@ -4,12 +4,7 @@
  */
 package org.lineageos.device.settings.display;
 
-import android.content.BroadcastReceiver;
-import android.content.Context;
-import android.content.Intent;
-import android.content.IntentFilter;
 import android.graphics.drawable.Icon;
-import android.os.Build;
 import android.service.quicksettings.Tile;
 import android.service.quicksettings.TileService;
 import android.util.Log;
@@ -21,7 +16,6 @@ public class HbmTile extends TileService {
     private static final String TAG = "HbmTile";
 
     private DisplayModeController mController;
-    private BroadcastReceiver mReceiver;
 
     @Override
     public void onCreate() {
@@ -32,14 +26,8 @@ public class HbmTile extends TileService {
     @Override
     public void onStartListening() {
         super.onStartListening();
-        registerReceiver();
+        // Also reached via TileService.requestListeningState from PWM changes
         updateTile();
-    }
-
-    @Override
-    public void onStopListening() {
-        super.onStopListening();
-        unregisterReceiver();
     }
 
     @Override
@@ -48,7 +36,7 @@ public class HbmTile extends TileService {
         boolean pwmEnabled = mController.isPwmEnabled();
 
         // Can't enable if PWM is active
-        if (! currentState && pwmEnabled) {
+        if (!currentState && pwmEnabled) {
             if (Constants.DEBUG) Log.w(TAG, "Cannot enable HBM: PWM active");
             updateTile();
             return;
@@ -110,41 +98,12 @@ public class HbmTile extends TileService {
             tile.setSubtitle(getString(R.string.hbm_unavailable_pwm_active));
         } else {
             tile.setState(targetHbmState ? Tile.STATE_ACTIVE : Tile.STATE_INACTIVE);
-            tile.setSubtitle(targetHbmState ?  getString(R.string.on) : getString(R.string.off));
+            tile.setSubtitle(targetHbmState ? getString(R.string.on) : getString(R.string.off));
         }
 
         tile.setLabel(getString(R.string.hbm_title));
         tile.setContentDescription(getString(R.string.hbm_summary));
         tile.setIcon(Icon.createWithResource(this, R.drawable.ic_hbm));
         tile.updateTile();
-    }
-
-    private void registerReceiver() {
-        if (mReceiver != null) return;
-
-        mReceiver = new BroadcastReceiver() {
-            @Override
-            public void onReceive(Context context, Intent intent) {
-                if (DisplayModeController.ACTION_DISPLAY_MODE_CHANGED.equals(intent.getAction())) {
-                    updateTile();
-                }
-            }
-        };
-
-        IntentFilter filter = new IntentFilter(DisplayModeController.ACTION_DISPLAY_MODE_CHANGED);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            registerReceiver(mReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
-        } else {
-            registerReceiver(mReceiver, filter);
-        }
-    }
-
-    private void unregisterReceiver() {
-        if (mReceiver != null) {
-            try {
-                unregisterReceiver(mReceiver);
-            } catch (Exception ignored) {}
-            mReceiver = null;
-        }
     }
 }
