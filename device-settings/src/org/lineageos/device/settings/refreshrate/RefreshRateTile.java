@@ -4,12 +4,7 @@
  */
 package org.lineageos.device.settings.refreshrate;
 
-import android.content.BroadcastReceiver;
-import android.content.Context;
-import android.content.Intent;
-import android.content.IntentFilter;
 import android.graphics.drawable.Icon;
-import android.os.Build;
 import android.service.quicksettings.Tile;
 import android.service.quicksettings.TileService;
 import android.util.Log;
@@ -30,7 +25,6 @@ public class RefreshRateTile extends TileService {
 
     private RefreshRateController mController;
     private DisplayModeController mDisplayController;
-    private BroadcastReceiver mReceiver;
 
     @Override
     public void onCreate() {
@@ -42,22 +36,16 @@ public class RefreshRateTile extends TileService {
     @Override
     public void onStartListening() {
         super.onStartListening();
-        registerReceiver();
+        // Also reached via TileService.requestListeningState when HBM/PWM changes
         updateTile();
-    }
-
-    @Override
-    public void onStopListening() {
-        super.onStopListening();
-        unregisterReceiver();
     }
 
     @Override
     public void onClick() {
         super.onClick();
 
-        // Check if refresh rate changes are blocked (HBM locks to 90Hz)
-        if (! mDisplayController.canChangeRefreshRate()) {
+        // Check if refresh rate changes are blocked (HBM locks to 120Hz)
+        if (!mDisplayController.canChangeRefreshRate()) {
             if (Constants.DEBUG) Log.w(TAG, "Cannot change: HBM active");
             updateTile();
             return;
@@ -139,35 +127,6 @@ public class RefreshRateTile extends TileService {
                 return getString(R.string.refresh_rate_120hz);
             default:
                 return getString(R.string.refresh_rate_auto);
-        }
-    }
-
-    private void registerReceiver() {
-        if (mReceiver != null) return;
-
-        mReceiver = new BroadcastReceiver() {
-            @Override
-            public void onReceive(Context context, Intent intent) {
-                if (DisplayModeController.ACTION_DISPLAY_MODE_CHANGED.equals(intent.getAction())) {
-                    updateTile();
-                }
-            }
-        };
-
-        IntentFilter filter = new IntentFilter(DisplayModeController.ACTION_DISPLAY_MODE_CHANGED);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            registerReceiver(mReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
-        } else {
-            registerReceiver(mReceiver, filter);
-        }
-    }
-
-    private void unregisterReceiver() {
-        if (mReceiver != null) {
-            try {
-                unregisterReceiver(mReceiver);
-            } catch (Exception ignored) {}
-            mReceiver = null;
         }
     }
 }
