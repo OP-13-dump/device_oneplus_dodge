@@ -39,6 +39,7 @@
         android:label="@string/device_title"
         android:defaultToDeviceProtectedStorage="true"
         android:directBootAware="true"
+        android:persistent="true"
         android:theme="@style/Theme.SubSettingsBase.Expressive"
         android:exported="true">
 
