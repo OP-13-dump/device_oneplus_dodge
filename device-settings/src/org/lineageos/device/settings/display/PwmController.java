@@ -49,8 +49,11 @@ public class PwmController {
         boolean wanted = mSharedPrefs.getBoolean(Constants.KEY_ONEPULSE_PWM, false);
         if (wanted && !isPwmEnabled()) {
             if (FileUtils.isFileWritable(Constants.NODE_ONEPULSE_PWM)) {
-                setPwm(true);
-                Log.i(TAG, "Restored PWM setting after boot");
+                if (setPwm(true)) {
+                    Log.i(TAG, "Restored PWM setting after boot");
+                } else {
+                    Log.w(TAG, "Failed to restore PWM setting after boot");
+                }
             } else {
                 Log.w(TAG, "PWM node is not writable, cannot restore setting");
             }
@@ -63,14 +66,22 @@ public class PwmController {
             return false;
         }
 
-        // PWM has priority: disable HBM if it's active
+        // PWM has priority: tear HBM down fully, then wait out any recent mode change
+        // (including a two-tap HBM-off tile → PWM-on that skips the in-line disable).
         HbmController hbmController = HbmController.getInstance(mContext);
         if (hbmController.isHbmEnabled()) {
             Log.i(TAG, "HBM is active, disabling it (PWM has priority)");
-            hbmController.disableHbm();
+            if (!hbmController.disableHbm()) {
+                Log.w(TAG, "Failed to disable HBM before enabling PWM");
+                return false;
+            }
         }
 
-        setPwm(true);
+        PanelModeSettle.awaitIfNeeded("before PWM on");
+        if (!setPwm(true)) {
+            return false;
+        }
+        PanelModeSettle.mark();
         return true;
     }
 
@@ -80,13 +91,31 @@ public class PwmController {
             return false;
         }
 
-        setPwm(false);
+        if (!setPwm(false)) {
+            return false;
+        }
+        // Kernel re-applies BL so 1P→DC runs now; mark so a following HBM on waits.
+        PanelModeSettle.mark();
         return true;
     }
 
-    private void setPwm(boolean enable) {
-        FileUtils.writeLine(Constants.NODE_ONEPULSE_PWM, enable ? "1" : "0");
+    /**
+     * Write onepulse sysfs and only persist the pref when the node matches.
+     * Kernel can refuse (e.g. hbm_max still active) with -EFAULT; treat that as failure.
+     */
+    private boolean setPwm(boolean enable) {
+        String want = enable ? "1" : "0";
+        if (!FileUtils.writeLine(Constants.NODE_ONEPULSE_PWM, want)) {
+            Log.w(TAG, "PWM sysfs write failed (enable=" + enable + ")");
+            return false;
+        }
+        String got = FileUtils.readLineTrimmed(Constants.NODE_ONEPULSE_PWM);
+        if (got == null || !want.equals(got)) {
+            Log.w(TAG, "PWM node mismatch after write: want=" + want + " got=" + got);
+            return false;
+        }
         mSharedPrefs.edit().putBoolean(Constants.KEY_ONEPULSE_PWM, enable).commit();
         Log.i(TAG, "PWM set to: " + enable);
+        return true;
     }
 }
