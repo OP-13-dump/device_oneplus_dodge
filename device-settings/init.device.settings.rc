@@ -1,8 +1,8 @@
 on boot
-    # Charging current cap; ueventd covers the node once the driver registers,
-    # this covers a late registration
-    chown system system /sys/class/oplus_chg/battery/cool_down
-    chmod 0660 /sys/class/oplus_chg/battery/cool_down
+    # Charger nodes (cool_down) are commonized in sm8750-common ueventd.oplus.rc
+    # and chowned by the charger driver when the attr is created. The boot
+    # trigger fires before the driver registers the node, so a chown here is
+    # inert. The display nodes below already exist here.
     # Display
     chown system system /sys/kernel/oplus_display/pwm_onepulse
     chmod 0666 /sys/kernel/oplus_display/pwm_onepulse
