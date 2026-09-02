@@ -22,6 +22,7 @@ import androidx.preference.SwitchPreferenceCompat;
 
 import org.lineageos.device.settings.Constants;
 import org.lineageos.device.settings.R;
+import org.lineageos.device.settings.display.DisplayModeController;
 import org.lineageos.device.settings.preferences.AppRefreshRatePreference;
 import org.lineageos.device.settings.utils.AppListManager;
 import org.lineageos.device.settings.utils.PackageListAdapter;
@@ -107,6 +108,25 @@ public class RefreshRateFragment extends PreferenceFragmentCompat {
     public void onResume() {
         super.onResume();
         refreshAppListUI();
+        applyHbmLock();
+    }
+
+    /**
+     * While HBM is on the panel is pinned to 120Hz, so the global refresh rate is
+     * inert. Disable the preference and show the same locked message the tile uses,
+     * for consistency. Re-enabled once HBM is off.
+     */
+    private void applyHbmLock() {
+        if (mGlobalRefreshRate == null) {
+            return;
+        }
+        boolean hbmActive = DisplayModeController.getInstance(getContext()).isHbmEnabled();
+        mGlobalRefreshRate.setEnabled(!hbmActive);
+        if (hbmActive) {
+            mGlobalRefreshRate.setSummary(R.string.refresh_rate_locked_hbm);
+        } else {
+            updateSummary();
+        }
     }
 
     private void updateSummary() {
