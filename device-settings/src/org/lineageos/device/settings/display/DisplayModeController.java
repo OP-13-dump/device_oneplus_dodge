@@ -7,9 +7,12 @@
  * Business rules:
  * - PWM has priority over HBM
  * - Enabling PWM will disable HBM automatically
- * - HBM cannot be enabled while PWM is active
- * - HBM locks refresh rate to 90Hz
+ * - HBM cannot be enabled while PWM is active (must disable PWM first)
+ * - HBM locks refresh rate to 120Hz
  * - Refresh rate tile should be disabled while HBM is active
+ * - All mode mutations are synchronized so tile spam cannot interleave HBM/PWM cmds
+ * - PanelModeSettle: every enter path waits out SETTLE_MS since the last mode
+ *   change (covers two-tap HBM-off tile then PWM-on, not only in-line teardown)
  */
 package org.lineageos.device.settings.display;
 
@@ -70,16 +73,16 @@ public class DisplayModeController {
     }
 
     /**
-     * Refresh rate changes blocked when HBM is active (locked to 90Hz)
+     * Refresh rate changes blocked when HBM is active (locked to 120Hz)
      */
     public boolean canChangeRefreshRate() {
-        return ! mHbmController.isHbmEnabled();
+        return !mHbmController.isHbmEnabled();
     }
 
-    // ===== State Mutations =====
+    // ===== State Mutations (serialized) =====
 
-    public boolean enableHbm() {
-        if (! canEnableHbm()) {
+    public synchronized boolean enableHbm() {
+        if (!canEnableHbm()) {
             if (Constants.DEBUG) Log.w(TAG, "Cannot enable HBM: PWM is active");
             return false;
         }
@@ -91,7 +94,7 @@ public class DisplayModeController {
         return success;
     }
 
-    public boolean disableHbm() {
+    public synchronized boolean disableHbm() {
         boolean success = mHbmController.disableHbm();
         if (success) {
             broadcastStateChange();
@@ -99,8 +102,8 @@ public class DisplayModeController {
         return success;
     }
 
-    public boolean enablePwm() {
-        // PWM has priority - PwmController.enablePwm() already disables HBM
+    public synchronized boolean enablePwm() {
+        // PwmController tears HBM down + settles, then enables PWM
         boolean success = mPwmController.enablePwm();
         if (success) {
             broadcastStateChange();
@@ -108,7 +111,8 @@ public class DisplayModeController {
         return success;
     }
 
-    public boolean disablePwm() {
+    public synchronized boolean disablePwm() {
+        // PwmController disables + settles so a following HBM on is safe
         boolean success = mPwmController.disablePwm();
         if (success) {
             broadcastStateChange();

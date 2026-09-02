@@ -85,30 +85,37 @@ public final class FileUtils {
      * Writes the given value into the given file
      *
      * @return true on success, false on failure
+     *
+     * Note: for sysfs nodes the kernel often reports errors on flush/close
+     * (e.g. -EFAULT refuse). Treat close failures as write failures so callers
+     * do not persist a pref when the driver rejected the change.
      */
     public static boolean writeLine(String fileName, String value) {
         BufferedWriter writer = null;
+        boolean ok = true;
 
         try {
             writer = new BufferedWriter(new FileWriter(fileName));
             writer.write(value);
+            writer.flush();
         } catch (FileNotFoundException e) {
             Log.w(TAG, "No such file " + fileName + " for writing", e);
-            return false;
+            ok = false;
         } catch (IOException e) {
             Log.e(TAG, "Could not write to file " + fileName, e);
-            return false;
+            ok = false;
         } finally {
             try {
                 if (writer != null) {
                     writer.close();
                 }
             } catch (IOException e) {
-                // Ignored, not much we can do anyway
+                Log.e(TAG, "Could not close " + fileName + " after write", e);
+                ok = false;
             }
         }
 
-        return true;
+        return ok;
     }
 
     /**
