@@ -277,7 +277,7 @@
 
     <!-- HBM/PWM/RefreshRate tile messages -->
     <string name="hbm_unavailable_pwm_active">PWM is active</string>
-    <string name="refresh_rate_locked_hbm">Locked at 90Hz (HBM)</string>
+    <string name="refresh_rate_locked_hbm">Locked at 120Hz (HBM)</string>
 
     <!-- Vibration & Haptics -->
     <string name="vibration_category_title">Vibration &amp; Haptics</string>
