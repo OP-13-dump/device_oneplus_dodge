@@ -4,12 +4,7 @@
  */
 package org.lineageos.device.settings.display;
 
-import android.content.BroadcastReceiver;
-import android.content.Context;
-import android.content.Intent;
-import android.content.IntentFilter;
 import android.graphics.drawable.Icon;
-import android.os.Build;
 import android.service.quicksettings.Tile;
 import android.service.quicksettings.TileService;
 import android.util.Log;
@@ -21,7 +16,6 @@ public class PwmTile extends TileService {
     private static final String TAG = "PwmTile";
 
     private DisplayModeController mController;
-    private BroadcastReceiver mReceiver;
 
     @Override
     public void onCreate() {
@@ -32,14 +26,7 @@ public class PwmTile extends TileService {
     @Override
     public void onStartListening() {
         super.onStartListening();
-        registerReceiver();
         updateTile();
-    }
-
-    @Override
-    public void onStopListening() {
-        super.onStopListening();
-        unregisterReceiver();
     }
 
     @Override
@@ -52,6 +39,8 @@ public class PwmTile extends TileService {
 
         final boolean turningOff = currentState;
         new Thread(() -> {
+            // enablePwm forces HBM off → DisplayModeController requestListeningState(HbmTile)
+            // and RefreshRateTile; disablePwm unlocks HbmTile the same way.
             boolean success = turningOff
                     ? mController.disablePwm()
                     : mController.enablePwm();
@@ -75,7 +64,7 @@ public class PwmTile extends TileService {
 
         boolean pwmEnabled = mController.isPwmEnabled();
 
-        tile.setState(pwmEnabled ?  Tile.STATE_ACTIVE : Tile.STATE_INACTIVE);
+        tile.setState(pwmEnabled ? Tile.STATE_ACTIVE : Tile.STATE_INACTIVE);
         tile.setSubtitle(pwmEnabled ? getString(R.string.on) : getString(R.string.off));
         tile.setLabel(getString(R.string.onepulse_pwm_mode_title));
         tile.setContentDescription(getString(R.string.onepulse_pwm_mode_summary));
@@ -91,39 +80,10 @@ public class PwmTile extends TileService {
         if (tile == null) return;
 
         tile.setState(targetPwmState ? Tile.STATE_ACTIVE : Tile.STATE_INACTIVE);
-        tile.setSubtitle(targetPwmState ?  getString(R.string.on) : getString(R.string.off));
+        tile.setSubtitle(targetPwmState ? getString(R.string.on) : getString(R.string.off));
         tile.setLabel(getString(R.string.onepulse_pwm_mode_title));
         tile.setContentDescription(getString(R.string.onepulse_pwm_mode_summary));
         tile.setIcon(Icon.createWithResource(this, R.drawable.ic_pwm));
         tile.updateTile();
-    }
-
-    private void registerReceiver() {
-        if (mReceiver != null) return;
-
-        mReceiver = new BroadcastReceiver() {
-            @Override
-            public void onReceive(Context context, Intent intent) {
-                if (DisplayModeController.ACTION_DISPLAY_MODE_CHANGED.equals(intent.getAction())) {
-                    updateTile();
-                }
-            }
-        };
-
-        IntentFilter filter = new IntentFilter(DisplayModeController.ACTION_DISPLAY_MODE_CHANGED);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            registerReceiver(mReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
-        } else {
-            registerReceiver(mReceiver, filter);
-        }
-    }
-
-    private void unregisterReceiver() {
-        if (mReceiver != null) {
-            try {
-                unregisterReceiver(mReceiver);
-            } catch (Exception ignored) {}
-            mReceiver = null;
-        }
     }
 }
