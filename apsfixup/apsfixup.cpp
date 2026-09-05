@@ -44,6 +44,7 @@
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/system_properties.h>
+#include <time.h>
 #include <unistd.h>
 
 #define TAG "apsfixup"
@@ -253,6 +254,30 @@ extern "C" __attribute__((visibility("hidden"))) void aps_repair_structs(void* a
     repair_struct(a4);
 }
 
+// In-camera review / Quick JPEG is a 960x1280 buffer with Cb/Cr swapped vs the
+// APS final on *photo* mode. Portrait stills do not have that swap: after the
+// chroma repair the Quick JPEG is already correct, so swapping it makes the
+// in-app thumbnail (and the shutter flash) look wrong while Gallery, which
+// reads the APS JPEG, looks fine. Skip the swap for a few seconds after a
+// bokeh/DCIR still.
+static uint64_t g_portrait_until_ns = 0;
+
+static uint64_t aps_now_ns() {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (uint64_t)ts.tv_sec * 1000000000ull + (uint64_t)ts.tv_nsec;
+}
+
+extern "C" void aps_mark_portrait() {
+    g_portrait_until_ns = aps_now_ns() + 4000000000ull;
+    LOGI("portrait still: skip Quick JPEG U/V swap");
+}
+
+static bool qj_skip_portrait() {
+    uint64_t until = g_portrait_until_ns;
+    return until != 0 && aps_now_ns() < until;
+}
+
 // Each ARC_Turbo_*_Process keeps its own real pointer + trampoline so RAW and
 // HDR can be live at the same time. The trampoline is naked asm because these
 // functions take x0-x7 plus stack args -- a C wrapper would drop the stack.
@@ -288,11 +313,44 @@ extern "C" __attribute__((visibility("hidden"))) void aps_repair_structs(void* a
         "    ldr  x16, [x16]\n"                                                   \
         "    br   x16\n");
 
+#define ARC_TRAMP_PORTRAIT(tag)                                                   \
+    extern "C" __attribute__((visibility("hidden"))) void* aps_real_##tag;        \
+    extern "C" void wrap_arc_##tag();                                             \
+    __asm__(                                                                      \
+        "    .text\n"                                                             \
+        "    .balign 4\n"                                                         \
+        "    .global wrap_arc_" #tag "\n"                                         \
+        "    .type wrap_arc_" #tag ", %function\n"                                \
+        "wrap_arc_" #tag ":\n"                                                    \
+        "    stp x29, x30, [sp, #-0x60]!\n"                                       \
+        "    mov x29, sp\n"                                                       \
+        "    stp x0, x1, [sp, #0x10]\n"                                           \
+        "    stp x2, x3, [sp, #0x20]\n"                                           \
+        "    stp x4, x5, [sp, #0x30]\n"                                           \
+        "    stp x6, x7, [sp, #0x40]\n"                                           \
+        "    str x8, [sp, #0x50]\n"                                               \
+        "    bl  aps_mark_portrait\n"                                             \
+        "    ldr x0, [sp, #0x18]\n"                                               \
+        "    ldr x1, [sp, #0x20]\n"                                               \
+        "    ldr x2, [sp, #0x28]\n"                                               \
+        "    ldr x3, [sp, #0x30]\n"                                               \
+        "    bl  aps_repair_structs\n"                                            \
+        "    ldp x0, x1, [sp, #0x10]\n"                                           \
+        "    ldp x2, x3, [sp, #0x20]\n"                                           \
+        "    ldp x4, x5, [sp, #0x30]\n"                                           \
+        "    ldp x6, x7, [sp, #0x40]\n"                                           \
+        "    ldr x8, [sp, #0x50]\n"                                               \
+        "    ldp x29, x30, [sp], #0x60\n"                                         \
+        "    adrp x16, aps_real_" #tag "\n"                                       \
+        "    add  x16, x16, #:lo12:aps_real_" #tag "\n"                           \
+        "    ldr  x16, [x16]\n"                                                   \
+        "    br   x16\n");
+
 ARC_TRAMP(raw)
-ARC_TRAMP(raw_bokeh)
+ARC_TRAMP_PORTRAIT(raw_bokeh)
 ARC_TRAMP(hdr)
-ARC_TRAMP(hdr_bokeh)
-ARC_TRAMP(dcir)
+ARC_TRAMP_PORTRAIT(hdr_bokeh)
+ARC_TRAMP_PORTRAIT(dcir)
 
 extern "C" __attribute__((visibility("hidden"))) void* aps_real_raw = nullptr;
 extern "C" __attribute__((visibility("hidden"))) void* aps_real_raw_bokeh = nullptr;
@@ -995,6 +1053,7 @@ static bool qj_swap_jpeg_uv(unsigned char* p, size_t cap) {
 // qj_swap_at: this pointer only. Size-gate so we do not read GPU dmabufs
 // that happen to be children of an AlgoProcess object.
 static int qj_swap_at(void* p) {
+    if (qj_skip_portrait()) return 0;
     p = qj_untag(p);
     if (!p) return 0;
     uint64_t b = 0, s = 0;
@@ -1042,6 +1101,7 @@ static int qj_swap_obj(void* obj, int nwords) {
 
 // Exact-size 1280x960 YUV only. Those sizes are linear NV12, including dmabuf.
 static int qj_swap_yuv_sized() {
+    if (qj_skip_portrait()) return 0;
     FILE* f = fopen("/proc/self/maps", "re");
     if (!f) return 0;
     char line[512];
@@ -1075,6 +1135,7 @@ static bool g_proc_req_hooked = false;
 
 static int wrap_proc_req(void* self, bool flag, void** bufs, void* a3, int w, int h) {
     int rc = g_real_proc_req(self, flag, bufs, a3, w, h);
+    if (qj_skip_portrait()) return rc;
     if (qj_is_quick_wh(w, h)) {
         int n = qj_swap_obj(bufs, 16) + qj_swap_obj(a3, 16);
         if (!n) n = qj_swap_yuv_sized();
@@ -1091,6 +1152,7 @@ static hwjpeg_t g_real_hwjpeg = nullptr;
 static bool g_hwjpeg_hooked = false;
 
 static int wrap_hwjpeg(void* data, void* buf, int a, unsigned char b, int c, int d) {
+    if (qj_skip_portrait()) return g_real_hwjpeg(data, buf, a, b, c, d);
     int n = qj_swap_obj(buf, 16) + qj_swap_obj(data, 16);
     if (!n) n = qj_swap_yuv_sized();
     if (n) LOGI("qj-uv before hwJpegEncodec swapped %d (d=%d)", n, d);
@@ -1107,6 +1169,7 @@ static bool g_dumpqj_hooked = false;
 
 static int wrap_dumpqj(void* self, void* data, int n) {
     int rc = g_real_dumpqj(self, data, n);
+    if (qj_skip_portrait()) return rc;
     // File only. The first on-screen frame may already have been painted
     // from YUV; this keeps the cache and any late decode in sync.
     // Use nftw-less: try the newest names via a dir fd + getdents is messy
