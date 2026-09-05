@@ -14,14 +14,14 @@
 // Durable across firmware bumps:
 //   * JUMP_SLOT offsets are discovered by walking the in-memory ELF (dynsym +
 //     JMPREL). No pinned BuildId / P010_FUNC_OFF / DLSYM_GOT_OFF.
-//   * wrap_dlsym interposes ARC_Turbo_RAW_Process and ARC_Turbo_HDR_Process
-//     (and HDR_Bokeh for portrait). A.01+ routes stills through TURBOHDR;
+//   * wrap_dlsym interposes ARC_Turbo_RAW/HDR/HDR_Bokeh and ARC_DCIR_Process
+//     (portrait dual-cam stills). A.01+ routes stills through TURBOHDR;
 //     hooking only RAW left those frames uncorrected (OpenCL then ION-failed
 //     and the JPEG was green).
-//   * RAW_Bokeh is NOT wrapped: close-up dlsyms it, then runs TFRSN night
-//     fusion. The P010 chroma heuristic is for 12.5MP stills, not bokeh /
-//     disparity structs. Wrapping it + letting TFRSN_PreProcess run left
-//     DeferJob / CapThread wedged and the shutter frozen (APS pending ~300).
+//   * RAW_Bokeh is wrapped for chroma repair, but TFRSN is bypassed while it
+//     is loaded so close-up fusion cannot wedge DeferJob / CapThread.
+//   * Portrait stills have main+aux snapshot planes in one struct. Do not
+//     treat a live aux Y pointer as UV or the JPEG flickers blue/green.
 //   * Unknown ARC_Turbo_*_Process names are passed through. Aliasing them
 //     onto the HDR trampoline overwrote aps_real_hdr.
 //   * A first-try GOT miss is retried, not latched as "blob drift". BIND_NOW
@@ -169,6 +169,14 @@ static void dump_struct_once(uint8_t* b, uint64_t lim) {
     }
 }
 
+// Portrait dual-cam stills put main Y and aux Y next to each other, both
+// live 4MB+ mappings. Treating the aux pointer as UV (the photo-mode
+// green-frame heuristic) smashes disparity and the JPEG comes out blue
+// or green at random, depending on which pair the scan hit first.
+//
+// Only rewrite UV when it is not itself a second snapshot plane. Pick the
+// largest live plane as luma so we don't "repair" the UV half (avail ~1/3)
+// as if it were Y.
 static void repair_struct(void* p) {
     if (!p) return;
     uint64_t mb, ms;
@@ -176,36 +184,73 @@ static void repair_struct(void* p) {
     uint8_t* b = (uint8_t*)p;
     uint64_t lim = mb + ms;
     dump_struct_once(b, lim);
+
+    int best_off = -1;
+    uint64_t best_luma = 0, best_lb = 0, best_avail = 0;
     for (int off = 0; off + 16 <= 0x80 && (uint64_t)(b + off + 16) <= lim; off += 8) {
-        uint64_t luma = *(uint64_t*)(b + off), chroma = *(uint64_t*)(b + off + 8);
+        uint64_t luma = *(uint64_t*)(b + off);
         uint64_t lb, avail;
         if (!plane_ok(luma, &lb, &avail)) continue;
-        uint64_t cb, cs;
-        // Packed flags (0x41 etc.) are not planes. Skip them so we don't
-        // smash metadata at the start of the struct.
-        if (chroma && chroma < 0x10000ull) continue;
-        // Same mapping as luma => UV is already correct. A different
-        // mapping is the port's garbage chroma (green frames).
-        if (chroma && range_of(chroma, &cb, &cs) && cb == lb) continue;
-        uint64_t ysize = (avail * 2 / 3) & ~0xfffULL;
-        *(uint64_t*)(b + off + 8) = luma + ysize;
-        uint32_t yp = 0;
-        if ((uint64_t)(b + off + 0x28) <= lim) {
-            yp = *(uint32_t*)(b + off + 0x20);
-            if (yp > 0 && *(uint32_t*)(b + off + 0x24) == 0)
-                *(uint32_t*)(b + off + 0x24) = yp;
+        if (avail > best_avail) {
+            best_avail = avail;
+            best_luma = luma;
+            best_lb = lb;
+            best_off = off;
         }
-        LOGI("chroma fix @+0x%x: luma=%p chroma=%p -> %p (avail=0x%llx ysize=0x%llx pitch=%u)",
-             off, (void*)luma, (void*)chroma, (void*)(luma + ysize),
-             (unsigned long long)avail, (unsigned long long)ysize, yp);
-        return;
     }
+    if (best_off < 0) return;
+
+    uint64_t chroma = *(uint64_t*)(b + best_off + 8);
+    if (chroma && chroma < 0x10000ull && best_off < 0x20) return;
+
+    uint64_t ysize = (best_avail * 2 / 3) & ~0xfffULL;
+    uint64_t expected = best_luma + ysize;
+
+    uint64_t cb, cavail;
+    if (chroma && plane_ok(chroma, &cb, &cavail)) {
+        if (cb != best_lb) {
+            // Different mapping. A real aux/stereo plane sits at the start
+            // of its own dmabuf and is about the same size as luma. Garbage
+            // UV from the P010 bug is a random offset into a huge ION.
+            uint64_t chroma_off = chroma - cb;
+            uint64_t lo = best_avail < cavail ? best_avail : cavail;
+            uint64_t hi = best_avail < cavail ? cavail : best_avail;
+            if (chroma_off < 0x2000 && lo > 0 && hi / lo <= 2) return;
+        } else {
+            int64_t d = (int64_t)chroma - (int64_t)expected;
+            if (d < 0) d = -d;
+            if (d < 0x2000) {
+                // Already at the 4:2:0 plane. Still fix a zero chroma pitch.
+                if ((uint64_t)(b + best_off + 0x28) <= lim) {
+                    uint32_t yp = *(uint32_t*)(b + best_off + 0x20);
+                    uint32_t cp = *(uint32_t*)(b + best_off + 0x24);
+                    if (yp >= 256 && yp <= 16384 && cp == 0)
+                        *(uint32_t*)(b + best_off + 0x24) = yp;
+                }
+                return;
+            }
+        }
+    }
+
+    *(uint64_t*)(b + best_off + 8) = expected;
+    uint32_t yp = 0;
+    if ((uint64_t)(b + best_off + 0x28) <= lim) {
+        yp = *(uint32_t*)(b + best_off + 0x20);
+        uint32_t cp = *(uint32_t*)(b + best_off + 0x24);
+        if (yp >= 256 && yp <= 16384 && (cp == 0 || cp != yp))
+            *(uint32_t*)(b + best_off + 0x24) = yp;
+    }
+    LOGI("chroma fix @+0x%x: luma=%p chroma=%p -> %p (avail=0x%llx ysize=0x%llx pitch=%u)",
+         best_off, (void*)best_luma, (void*)chroma, (void*)expected,
+         (unsigned long long)best_avail, (unsigned long long)ysize, yp);
 }
 
-extern "C" __attribute__((visibility("hidden"))) void aps_repair_structs(void* a1, void* a2, void* a3) {
+extern "C" __attribute__((visibility("hidden"))) void aps_repair_structs(void* a1, void* a2,
+                                                                        void* a3, void* a4) {
     repair_struct(a1);
     repair_struct(a2);
     repair_struct(a3);
+    repair_struct(a4);
 }
 
 // Each ARC_Turbo_*_Process keeps its own real pointer + trampoline so RAW and
@@ -230,6 +275,7 @@ extern "C" __attribute__((visibility("hidden"))) void aps_repair_structs(void* a
         "    ldr x0, [sp, #0x18]\n"                                               \
         "    ldr x1, [sp, #0x20]\n"                                               \
         "    ldr x2, [sp, #0x28]\n"                                               \
+        "    ldr x3, [sp, #0x30]\n"                                               \
         "    bl  aps_repair_structs\n"                                            \
         "    ldp x0, x1, [sp, #0x10]\n"                                           \
         "    ldp x2, x3, [sp, #0x20]\n"                                           \
@@ -246,11 +292,13 @@ ARC_TRAMP(raw)
 ARC_TRAMP(raw_bokeh)
 ARC_TRAMP(hdr)
 ARC_TRAMP(hdr_bokeh)
+ARC_TRAMP(dcir)
 
 extern "C" __attribute__((visibility("hidden"))) void* aps_real_raw = nullptr;
 extern "C" __attribute__((visibility("hidden"))) void* aps_real_raw_bokeh = nullptr;
 extern "C" __attribute__((visibility("hidden"))) void* aps_real_hdr = nullptr;
 extern "C" __attribute__((visibility("hidden"))) void* aps_real_hdr_bokeh = nullptr;
+extern "C" __attribute__((visibility("hidden"))) void* aps_real_dcir = nullptr;
 extern "C" __attribute__((visibility("hidden"))) void* aps_real_tfrsn_pre = nullptr;
 extern "C" __attribute__((visibility("hidden"))) void* aps_real_tfrsn_proc = nullptr;
 extern "C" __attribute__((visibility("hidden"))) void* aps_real_tfrsn_post = nullptr;
@@ -302,6 +350,12 @@ static void patch_cached_tfrsn();
 
 static void* wrap_dlsym(void* handle, const char* symbol) {
     void* res = g_real_dlsym(handle, symbol);
+
+    if (res && symbol && !strcmp(symbol, "ARC_DCIR_Process")) {
+        aps_real_dcir = res;
+        LOGI("interposing ARC_DCIR_Process (real=%p)", res);
+        return (void*)wrap_arc_dcir;
+    }
 
     if (res && symbol && !strcmp(symbol, "ARC_Turbo_RAW_Bokeh_Process")) {
         aps_raw_bokeh_loaded = 1;
@@ -500,6 +554,8 @@ static bool g_p010_found = false;
 static bool g_dlsym_iface_done = false, g_dlsym_proc_done = false;
 static bool g_dlsym_iface_found = false, g_dlsym_proc_found = false;
 static uint64_t g_dlsym_iface_got = 0, g_dlsym_proc_got = 0;
+static bool g_dlsym_bokeh_done = false, g_dlsym_bokeh_found = false;
+static uint64_t g_dlsym_bokeh_got = 0;
 static bool g_tfrsn_patched = false;
 
 static bool hook_dlsym_in(const char* mod, uint64_t hint, bool* done, bool* found,
@@ -1144,6 +1200,8 @@ static void try_install() {
                   &g_dlsym_iface_got);
     hook_dlsym_in("libAlgoProcess.so", 0x800000, &g_dlsym_proc_done, &g_dlsym_proc_found,
                   &g_dlsym_proc_got);
+    hook_dlsym_in("libarcsoft_dualcam_bokeh_api.so", 0x800000, &g_dlsym_bokeh_done,
+                  &g_dlsym_bokeh_found, &g_dlsym_bokeh_got);
     hook_proc_req();
     hook_hwjpeg();
     hook_dumpqj();
@@ -1168,7 +1226,7 @@ static void* poller(void*) {
 }
 
 __attribute__((constructor)) static void apsfixup_init() {
-    LOGI("libapsfixup loaded (pid %d) RAW/HDR wrap, TFRSN, qj-uv", getpid());
+    LOGI("libapsfixup loaded (pid %d) RAW/HDR/DCIR wrap, TFRSN, qj-uv", getpid());
     try_install();
     pthread_t t;
     pthread_create(&t, nullptr, poller, nullptr);
