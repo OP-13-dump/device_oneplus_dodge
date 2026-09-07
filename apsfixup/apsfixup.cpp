@@ -1153,19 +1153,17 @@ static void qj_census_once() {
 }
 
 // Exact-size 1280x960 YUV only. Those sizes are linear NV12, including dmabuf.
-// Off: this matches on size alone, so it also hits the preview and review
-// buffers that are on screen (1280x960 NV12 is the same 1884160 bytes). It
-// swapped 1076 buffers in 5s against a 32-entry dedup ring, so the same
-// buffer flipped back and forth -- the orange flash after a portrait shot.
-static bool g_qj_scan_enabled = false;
-
+// Acts only when exactly one mapping matches. With more than one there is no
+// way to tell the Quick JPEG from a buffer that is on screen, and swapping
+// them all is the orange flash after a shot (1076 in 5s in portrait).
 static int qj_swap_yuv_sized() {
-    if (!g_qj_scan_enabled) return 0;
     if (qj_skip_portrait()) return 0;
     FILE* f = fopen("/proc/self/maps", "re");
     if (!f) return 0;
     char line[512];
     int n = 0;
+    unsigned long long cand_lo = 0, cand_hi = 0;
+    size_t cand_sz = 0;
     while (fgets(line, sizeof(line), f)) {
         unsigned long long lo = 0, hi = 0, off = 0, ino = 0;
         char perms[8] = {0}, dev[16] = {0}, path[256] = {0};
@@ -1180,13 +1178,20 @@ static int qj_swap_yuv_sized() {
         if (nf == 7 && path[0] == '/' && strncmp(path, "/dmabuf", 7) != 0 &&
             strncmp(path, "/memfd:", 7) != 0)
             continue;
-        auto* p = reinterpret_cast<unsigned char*>(static_cast<uintptr_t>(lo));
-        QJ_GUARDED(lo, hi, {
-            if (qj_swap_nv12(p, 1280, 960, sz)) n++;
-        });
+        if (!cand_lo) { cand_lo = lo; cand_hi = hi; cand_sz = sz; }
+        n++;
     }
     fclose(f);
-    return n;
+    if (n != 1) {
+        if (n) LOGW("qj-uv scan ambiguous (%d candidates), skipping", n);
+        return 0;
+    }
+    auto* p = reinterpret_cast<unsigned char*>(static_cast<uintptr_t>(cand_lo));
+    int done = 0;
+    QJ_GUARDED(cand_lo, cand_hi, {
+        if (qj_swap_nv12(p, 1280, 960, cand_sz)) done = 1;
+    });
+    return done;
 }
 
 typedef int (*proc_req_t)(void*, bool, void**, void*, int, int);
