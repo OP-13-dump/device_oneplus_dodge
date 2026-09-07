@@ -242,4 +242,17 @@
         <item>crisp</item>
         <item>richtap</item>
     </string-array>
+
+    <!-- Charging speed modes -->
+    <string-array name="charging_speed_entries" translatable="false">
+        <item>@string/charging_speed_default</item>
+        <item>@string/charging_speed_fast</item>
+        <item>@string/charging_speed_night</item>
+    </string-array>
+
+    <string-array name="charging_speed_values" translatable="false">
+        <item>default</item>
+        <item>fast</item>
+        <item>night</item>
+    </string-array>
 </resources>
