@@ -6,6 +6,8 @@
 package org.lineageos.device.settings.fastcharge;
 
 import android.content.Context;
+import android.content.Intent;
+import android.content.SharedPreferences;
 import android.provider.Settings;
 import android.util.Log;
 
@@ -46,36 +48,46 @@ public class FastChargeController {
         return FileUtils.isFileWritable(Constants.NODE_FAST_CHARGING);
     }
 
+    public String getChargingSpeedMode() {
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(mContext);
+        if (prefs.contains(Constants.KEY_CHARGING_SPEED)) {
+            return prefs.getString(Constants.KEY_CHARGING_SPEED, Constants.CHARGING_SPEED_DEFAULT);
+        }
+        // Migration from legacy toggles
+        if (prefs.getBoolean(Constants.KEY_NIGHT_CHARGING, false)) {
+            return Constants.CHARGING_SPEED_NIGHT;
+        } else if (!prefs.getBoolean(Constants.KEY_FAST_CHARGING, true)) {
+            return Constants.CHARGING_SPEED_DEFAULT;
+        }
+        return Constants.CHARGING_SPEED_DEFAULT;
+    }
+
+    public void setChargingSpeedMode(String mode) {
+        synchronized (mLock) {
+            PreferenceManager.getDefaultSharedPreferences(mContext)
+                    .edit()
+                    .putString(Constants.KEY_CHARGING_SPEED, mode)
+                    .commit();
+            mSessionBoost = false;
+            apply();
+            notifyModeChanged();
+        }
+    }
+
     public boolean isFastChargingEnabled() {
-        return PreferenceManager.getDefaultSharedPreferences(mContext)
-                .getBoolean(Constants.KEY_FAST_CHARGING, true);
+        return Constants.CHARGING_SPEED_FAST.equals(getChargingSpeedMode());
     }
 
     public boolean isNightModeEnabled() {
-        return PreferenceManager.getDefaultSharedPreferences(mContext)
-                .getBoolean(Constants.KEY_NIGHT_CHARGING, false);
+        return Constants.CHARGING_SPEED_NIGHT.equals(getChargingSpeedMode());
     }
 
     public void setFastChargingEnabled(boolean enabled) {
-        synchronized (mLock) {
-            PreferenceManager.getDefaultSharedPreferences(mContext)
-                    .edit()
-                    .putBoolean(Constants.KEY_FAST_CHARGING, enabled)
-                    .commit();
-            mSessionBoost = false;
-            apply();
-        }
+        setChargingSpeedMode(enabled ? Constants.CHARGING_SPEED_FAST : Constants.CHARGING_SPEED_DEFAULT);
     }
 
     public void setNightModeEnabled(boolean enabled) {
-        synchronized (mLock) {
-            PreferenceManager.getDefaultSharedPreferences(mContext)
-                    .edit()
-                    .putBoolean(Constants.KEY_NIGHT_CHARGING, enabled)
-                    .commit();
-            mSessionBoost = false;
-            apply();
-        }
+        setChargingSpeedMode(enabled ? Constants.CHARGING_SPEED_NIGHT : Constants.CHARGING_SPEED_DEFAULT);
     }
 
     /** SystemUI long-press. In memory only: prefs keep the persisted cap for the next plug. */
@@ -84,6 +96,7 @@ public class FastChargeController {
             if (mSessionBoost) return;
             mSessionBoost = true;
             apply();
+            notifyModeChanged();
             if (Constants.DEBUG) Log.i(TAG, "session boost");
         }
     }
@@ -108,15 +121,25 @@ public class FastChargeController {
 
         final String value;
         final int hudMode;
-        if (mSessionBoost || isFastChargingEnabled()) {
+        if (mSessionBoost) {
             value = Constants.COOL_DOWN_UNLIMITED;
             hudMode = Constants.HUD_MODE_UNLIMITED;
-        } else if (isNightModeEnabled()) {
-            value = Constants.COOL_DOWN_NIGHT;
-            hudMode = Constants.HUD_MODE_NIGHT;
         } else {
-            value = Constants.COOL_DOWN_STANDARD;
-            hudMode = Constants.HUD_MODE_STANDARD;
+            switch (getChargingSpeedMode()) {
+                case Constants.CHARGING_SPEED_FAST:
+                    value = Constants.COOL_DOWN_UNLIMITED;
+                    hudMode = Constants.HUD_MODE_UNLIMITED;
+                    break;
+                case Constants.CHARGING_SPEED_NIGHT:
+                    value = Constants.COOL_DOWN_NIGHT;
+                    hudMode = Constants.HUD_MODE_NIGHT;
+                    break;
+                case Constants.CHARGING_SPEED_DEFAULT:
+                default:
+                    value = Constants.COOL_DOWN_STANDARD;
+                    hudMode = Constants.HUD_MODE_STANDARD;
+                    break;
+            }
         }
 
         FileUtils.writeLine(Constants.NODE_FAST_CHARGING, value);
@@ -142,5 +165,11 @@ public class FastChargeController {
         } catch (Exception e) {
             Log.e(TAG, "Failed to publish charge HUD state", e);
         }
+    }
+
+    private void notifyModeChanged() {
+        Intent intent = new Intent(Constants.ACTION_CHARGING_SPEED_CHANGED);
+        intent.setPackage(mContext.getPackageName());
+        mContext.sendBroadcast(intent);
     }
 }

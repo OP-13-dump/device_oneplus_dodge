@@ -116,14 +116,24 @@ public class Constants {
 
     /* Fast charging current cap */
     public static final String NODE_FAST_CHARGING = "/sys/class/oplus_chg/battery/cool_down";
+    public static final String KEY_CHARGING_SPEED = "charging_speed";
     public static final String KEY_FAST_CHARGING = "fast_charging";
     public static final String KEY_NIGHT_CHARGING = "night_charging";
 
+    public static final String CHARGING_SPEED_DEFAULT = "default";
+    public static final String CHARGING_SPEED_FAST = "fast";
+    public static final String CHARGING_SPEED_NIGHT = "night";
+
+    public static final String ACTION_CHARGING_SPEED_CHANGED =
+            "org.lineageos.device.settings.action.CHARGING_SPEED_CHANGED";
+
     /** cool_down steps on svooc_2_0_curr_table (Ibus mA), DT vooc_curr_table_type=2.
-     *  0 unvotes USER_VOTER entirely: the 9.5 A / 100 W brick class. */
+     *  0 unvotes USER_VOTER entirely: the 9.5 A / 100 W brick class.
+     *  1: 1500 mA (Night mode)
+     *  8: 4500 mA (Default mode: ~35-40W max) */
     public static final String COOL_DOWN_UNLIMITED = "0";
     public static final String COOL_DOWN_NIGHT = "1";      // 1500 mA
-    public static final String COOL_DOWN_STANDARD = "5";   // 3000 mA
+    public static final String COOL_DOWN_STANDARD = "8";   // 4500 mA (~35-40W max)
 
     /** Mirrored to Settings.System for the SystemUI charging HUD, which must not
      *  read oplus_chg itself (platform_app is denied search on that dir). */

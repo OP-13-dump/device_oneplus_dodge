@@ -75,8 +75,7 @@ public class DeviceSettings extends SettingsBasePreferenceFragment
     private SwitchPreferenceCompat mHbmSwitch;
     private SwitchPreferenceCompat mSunlightBoostSwitch;
     private ListPreference mHapticProfilePref;
-    private SwitchPreferenceCompat mFastChargingSwitch;
-    private SwitchPreferenceCompat mNightChargingSwitch;
+    private ListPreference mChargingSpeedPref;
 
     private HbmController mHbmController;
     private PwmController mPwmController;
@@ -117,17 +116,15 @@ public class DeviceSettings extends SettingsBasePreferenceFragment
             mSunlightBoostSwitch.setEnabled(false);
         }
 
-        mFastChargingSwitch = (SwitchPreferenceCompat) findPreference(Constants.KEY_FAST_CHARGING);
-        mNightChargingSwitch = (SwitchPreferenceCompat) findPreference(Constants.KEY_NIGHT_CHARGING);
-        if (mFastChargeController.isSupported()) {
-            mFastChargingSwitch.setChecked(mFastChargeController.isFastChargingEnabled());
-            mFastChargingSwitch.setOnPreferenceChangeListener(this);
-            mNightChargingSwitch.setChecked(mFastChargeController.isNightModeEnabled());
-            mNightChargingSwitch.setOnPreferenceChangeListener(this);
-        } else {
-            // The dependency only tracks the parent's value, not its enabled state
-            mFastChargingSwitch.setEnabled(false);
-            mNightChargingSwitch.setEnabled(false);
+        mChargingSpeedPref = (ListPreference) findPreference(Constants.KEY_CHARGING_SPEED);
+        if (mChargingSpeedPref != null) {
+            if (mFastChargeController.isSupported()) {
+                mChargingSpeedPref.setValue(mFastChargeController.getChargingSpeedMode());
+                mChargingSpeedPref.setSummary(mChargingSpeedPref.getEntry());
+                mChargingSpeedPref.setOnPreferenceChangeListener(this);
+            } else {
+                mChargingSpeedPref.setEnabled(false);
+            }
         }
 
         // Sync UI state based on current HBM/PWM state
@@ -149,6 +146,10 @@ public class DeviceSettings extends SettingsBasePreferenceFragment
         super.onResume();
         // Refresh state when returning to settings
         syncHbmPwmState();
+        if (mChargingSpeedPref != null && mFastChargeController.isSupported()) {
+            mChargingSpeedPref.setValue(mFastChargeController.getChargingSpeedMode());
+            mChargingSpeedPref.setSummary(mChargingSpeedPref.getEntry());
+        }
     }
 
     /**
@@ -245,11 +246,13 @@ public class DeviceSettings extends SettingsBasePreferenceFragment
                 mHbmSwitch.setEnabled(FileUtils.isFileWritable(Constants.NODE_HBM));
             }
             return true;
-        } else if (preference == mFastChargingSwitch) {
-            mFastChargeController.setFastChargingEnabled((Boolean) newValue);
-            return true;
-        } else if (preference == mNightChargingSwitch) {
-            mFastChargeController.setNightModeEnabled((Boolean) newValue);
+        } else if (preference == mChargingSpeedPref) {
+            String mode = (String) newValue;
+            mFastChargeController.setChargingSpeedMode(mode);
+            int index = mChargingSpeedPref.findIndexOfValue(mode);
+            if (index >= 0) {
+                mChargingSpeedPref.setSummary(mChargingSpeedPref.getEntries()[index]);
+            }
             return true;
         } else if (preference == mSunlightBoostSwitch) {
             boolean enabled = (Boolean) newValue;
