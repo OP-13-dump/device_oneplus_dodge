@@ -186,6 +186,12 @@ public class DeviceSettings extends SettingsBasePreferenceFragment
     }
 
     private void initNotificationSliderPreference() {
+        ListPreference usagePref = (ListPreference) findPreference(
+                Constants.KEY_NOTIF_SLIDER_USAGE);
+        if (usagePref == null) {
+            return;
+        }
+
         registerPreferenceListener(Constants.KEY_NOTIF_SLIDER_USAGE);
         registerPreferenceListener(Constants.KEY_NOTIF_SLIDER_ACTION_TOP);
         registerPreferenceListener(Constants.KEY_NOTIF_SLIDER_ACTION_MIDDLE);
@@ -193,21 +199,23 @@ public class DeviceSettings extends SettingsBasePreferenceFragment
 
         for (String key : SLIDER_APP_KEYS) {
             Preference pref = findPreference(key);
-            pref.setOnPreferenceClickListener(p -> {
-                showSliderAppSelectionDialog(key);
-                return true;
-            });
-            updateSliderAppSummary(key);
+            if (pref != null) {
+                pref.setOnPreferenceClickListener(p -> {
+                    showSliderAppSelectionDialog(key);
+                    return true;
+                });
+                updateSliderAppSummary(key);
+            }
         }
 
-        ListPreference usagePref = (ListPreference) findPreference(
-                Constants.KEY_NOTIF_SLIDER_USAGE);
         handleSliderUsageChange(usagePref.getValue());
     }
 
     private void registerPreferenceListener(String key) {
         Preference p = findPreference(key);
-        p.setOnPreferenceChangeListener(this);
+        if (p != null) {
+            p.setOnPreferenceChangeListener(this);
+        }
     }
 
     @Override
