@@ -126,21 +126,15 @@
             android:summary="@string/bypass_charging_summary"
             android:fragment="org.lineageos.device.settings.bypasschrg.BypassChargingFragment" />
 
-        <SwitchPreferenceCompat
+        <ListPreference
+            android:key="charging_speed"
             android:icon="@drawable/ic_fast_charging"
-            android:key="fast_charging"
-            android:defaultValue="true"
-            android:disableDependentsState="true"
-            android:title="@string/fast_charging_title"
-            android:summary="@string/fast_charging_summary" />
-
-        <SwitchPreferenceCompat
-            android:icon="@drawable/ic_night_charging"
-            android:key="night_charging"
-            android:defaultValue="false"
-            android:dependency="fast_charging"
-            android:title="@string/night_charging_title"
-            android:summary="@string/night_charging_summary" />
+            android:title="@string/charging_speed_title"
+            android:dialogTitle="@string/charging_speed_title"
+            android:entries="@array/charging_speed_entries"
+            android:entryValues="@array/charging_speed_values"
+            android:defaultValue="default"
+            android:summary="%s" />
 
     </PreferenceCategory>
 
