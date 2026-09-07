@@ -21,6 +21,7 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Handler;
 import android.os.IBinder;
+import android.os.UserHandle;
 import android.text.TextUtils;
 import android.util.Log;
 
@@ -80,7 +81,7 @@ public class GameBarMonitorService extends Service {
             // Start service
             Intent serviceIntent = new Intent(context, GameBarMonitorService.class);
             try {
-                context.startService(serviceIntent);
+                context.startServiceAsUser(serviceIntent, UserHandle.SYSTEM);
                 if (Constants.DEBUG) Log.i(TAG, "Service started");
             } catch (Exception e) {
                 Log.e(TAG, "Failed to start service", e);
