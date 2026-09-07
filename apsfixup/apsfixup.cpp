@@ -615,6 +615,8 @@ static uint64_t g_dlsym_iface_got = 0, g_dlsym_proc_got = 0;
 static bool g_dlsym_bokeh_done = false, g_dlsym_bokeh_found = false;
 static uint64_t g_dlsym_bokeh_got = 0;
 static bool g_tfrsn_patched = false;
+static bool g_tfrsn_gaveup = false;
+static int g_tfrsn_tries = 0;
 
 static bool hook_dlsym_in(const char* mod, uint64_t hint, bool* done, bool* found,
                           uint64_t* got_off) {
@@ -678,7 +680,7 @@ static int replace_ptrs_writable(void* from, void* to) {
 }
 
 static void patch_cached_tfrsn() {
-    if (g_tfrsn_patched || !g_real_dlsym) return;
+    if (g_tfrsn_patched || g_tfrsn_gaveup || !g_real_dlsym) return;
     uint64_t fusion = 0;
     if (!module_base("libarcsoft_turbo_fusion_raw_super_night.so", &fusion)) return;
 
@@ -703,8 +705,12 @@ static void patch_cached_tfrsn() {
         g_tfrsn_patched = true;
         LOGI("patched %d cached TFRSN pointer(s) close-up-skip=%u", n,
              (unsigned)aps_raw_bokeh_loaded);
-    } else {
-        LOGW("TFRSN exports live but no cached pointers found yet");
+    } else if (++g_tfrsn_tries >= 60) {
+        // Each miss rescans every writable mapping four times (~34ms) and the
+        // poller has no !have_fusion escape, so an A.01 stack that never caches
+        // these pointers pinned a core for the full 10 minute poll.
+        g_tfrsn_gaveup = true;
+        LOGW("no cached TFRSN pointers after %d scans, giving up", g_tfrsn_tries);
     }
 }
 
@@ -1278,7 +1284,8 @@ static void* poller(void*) {
         uint64_t fusion = 0;
         bool have_fusion = module_base("libarcsoft_turbo_fusion_raw_super_night.so", &fusion);
         if (g_p010_done && g_dlsym_iface_done && g_dlsym_proc_done && g_proc_req_hooked &&
-            g_hwjpeg_hooked && (g_tfrsn_patched || (!have_fusion && i > 200)))
+            g_hwjpeg_hooked &&
+            (g_tfrsn_patched || g_tfrsn_gaveup || (!have_fusion && i > 200)))
             break;
         usleep(25 * 1000);
     }
