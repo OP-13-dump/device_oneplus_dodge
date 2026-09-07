@@ -270,12 +270,15 @@ static uint64_t aps_now_ns() {
 
 extern "C" void aps_mark_portrait() {
     g_portrait_until_ns = aps_now_ns() + 4000000000ull;
-    LOGI("portrait still: skip Quick JPEG U/V swap");
+    LOGI("portrait still: bokeh/DCIR seen");
 }
 
+// Portrait needs the swap too. The skip was written while the scan was still
+// swapping every same-sized mapping, so what it measured was the carpet-bomb,
+// not this buffer -- with the swap gated off, portrait comes out tinted.
+// Kept as a marker only; g_portrait_until_ns still drives the logs.
 static bool qj_skip_portrait() {
-    uint64_t until = g_portrait_until_ns;
-    return until != 0 && aps_now_ns() < until;
+    return false;
 }
 
 // Each ARC_Turbo_*_Process keeps its own real pointer + trampoline so RAW and
