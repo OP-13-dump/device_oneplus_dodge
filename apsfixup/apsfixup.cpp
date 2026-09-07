@@ -1106,7 +1106,14 @@ static int qj_swap_obj(void* obj, int nwords) {
 }
 
 // Exact-size 1280x960 YUV only. Those sizes are linear NV12, including dmabuf.
+// Off: this matches on size alone, so it also hits the preview and review
+// buffers that are on screen (1280x960 NV12 is the same 1884160 bytes). It
+// swapped 1076 buffers in 5s against a 32-entry dedup ring, so the same
+// buffer flipped back and forth -- the orange flash after a portrait shot.
+static bool g_qj_scan_enabled = false;
+
 static int qj_swap_yuv_sized() {
+    if (!g_qj_scan_enabled) return 0;
     if (qj_skip_portrait()) return 0;
     FILE* f = fopen("/proc/self/maps", "re");
     if (!f) return 0;
