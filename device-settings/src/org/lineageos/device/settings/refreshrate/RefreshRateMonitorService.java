@@ -84,7 +84,7 @@ public class RefreshRateMonitorService extends Service {
             // Start service
             Intent serviceIntent = new Intent(context, RefreshRateMonitorService.class);
             try {
-                context.startService(serviceIntent);
+                context.startServiceAsUser(serviceIntent, UserHandle.SYSTEM);
                 if (Constants.DEBUG) Log.i(TAG, "Service started");
             } catch (Exception e) {
                 Log.e(TAG, "Failed to start service", e);
