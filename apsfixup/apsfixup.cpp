@@ -1129,11 +1129,35 @@ static int qj_swap_obj_first(void* obj, int nwords) {
     return 0;
 }
 
-// One-shot: if the walk still misses, say what the candidates actually are.
+// bufs is an array of pointers to buffer structs, so the YUV can sit one level
+// below the object. Leaf is still size-gated and we stop at the first hit.
+static int qj_swap_obj_first2(void* obj, int n1, int n2) {
+    obj = qj_untag(obj);
+    if (!obj || n1 <= 0) return 0;
+    uint64_t b = 0, s = 0;
+    if (!range_of((uint64_t)obj, &b, &s)) return 0;
+    int n = qj_swap_at(obj);
+    if (n) return n;
+    size_t max = (size_t)(s - ((uint64_t)obj - b)) / sizeof(void*);
+    if (max > (size_t)n1) max = (size_t)n1;
+    auto** w = reinterpret_cast<void**>(obj);
+    for (size_t i = 0; i < max; i++) {
+        void* v = nullptr;
+        QJ_GUARDED(b, b + s, { v = w[i]; });
+        if (!v) continue;
+        if ((n = qj_swap_at(v)) != 0) return n;
+        if ((n = qj_swap_obj_first(v, n2)) != 0) return n;
+    }
+    return 0;
+}
+
+// If the walk misses, say what the candidates actually are. Emit a few times,
+// not once: the camera process outlives a logcat clear, so a one-shot census
+// is usually already spent by the time anyone is watching.
 static void qj_census_once() {
-    static bool done = false;
-    if (done) return;
-    done = true;
+    static int left = 5;
+    if (left <= 0) return;
+    left--;
     FILE* f = fopen("/proc/self/maps", "re");
     if (!f) return;
     char line[512];
@@ -1208,7 +1232,10 @@ static int wrap_proc_req(void* self, bool flag, void** bufs, void* a3, int w, in
         int n = qj_swap_obj(bufs, 16) + qj_swap_obj(a3, 16);
         if (!n) n = qj_swap_obj_first(bufs, 512);
         if (!n) n = qj_swap_obj_first(a3, 512);
+        if (!n) n = qj_swap_obj_first2(bufs, 256, 256);
+        if (!n) n = qj_swap_obj_first2(a3, 256, 256);
         if (!n) n = qj_swap_yuv_sized();
+        if (!n) qj_census_once();
         LOGI(n ? "qj-uv after processOfflineRequest swapped %d"
                : "qj-uv after processOfflineRequest found no buffer",
              n);
