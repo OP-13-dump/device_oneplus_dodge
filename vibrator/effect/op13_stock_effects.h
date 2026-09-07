@@ -958,9 +958,9 @@ static const struct effect_stream effects_op13def[] = {
 static const struct effect_stream effects_op13soft[] = {
     {
         .effect_id = 0,
-        .length = 35,
+        .length = 723,
         .play_rate_hz = 24000,
-        .data = effect_0_op13soft,
+        .data = effect_2_op13soft,
     },
     {
         .effect_id = 1,
