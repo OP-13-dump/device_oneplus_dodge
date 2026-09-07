@@ -130,6 +130,17 @@ def set_camera_capture_hdr_support(ctx, file, file_path, *args, **kwargs):
 def set_photocodec_not_support(ctx, file, file_path, *args, **kwargs):
     update_vendor_tag(ctx, file, file_path, "com.oplus.feature.photocodec.support", "0")
 
+# Super Text is the document/text scan mode. Its Quick JPEG comes out Cb/Cr
+# swapped and apsfixup cannot reach that buffer, so hide the mode rather than
+# ship it inverted. QR scanning is a separate tag and stays on.
+def set_super_text_not_support(ctx, file, file_path, *args, **kwargs):
+    for tag in (
+        "com.oplus.feature.super.text.support",
+        "com.oplus.feature.super.text.support.v2",
+        "com.oplus.feature.super.text.two.support",
+    ):
+        update_vendor_tag(ctx, file, file_path, tag, "0")
+
 blob_fixups: blob_fixups_user_type = {
     'odm/etc/init/init.camera_process.rc': blob_fixup()
         .regex_replace('    delete_recursion', '    #delete_recursion'),
@@ -250,7 +261,8 @@ blob_fixups: blob_fixups_user_type = {
         .call(set_video_4k120fps_max_zoom_list)
         .call(set_video_dv_120fps_support)
         .call(set_camera_capture_hdr_support)
-        .call(set_photocodec_not_support),
+        .call(set_photocodec_not_support)
+        .call(set_super_text_not_support),
 }  # fmt: skip
 
 module = ExtractUtilsModule(
