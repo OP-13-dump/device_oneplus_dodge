@@ -661,7 +661,7 @@ static const struct effect_stream effects_crisp[] = {
 };
 
 static const struct effect_stream effects_gentle[] = {
-    { /* CLICK */ .effect_id = 0, .length = ARRAY_SIZE(effect_0_gentle), .play_rate_hz = 24000, .data = effect_0_gentle },
+    { /* CLICK */ .effect_id = 0, .length = ARRAY_SIZE(effect_2_gentle), .play_rate_hz = 24000, .data = effect_2_gentle },
     { /* DOUBLE_CLICK */ .effect_id = 1, .length = ARRAY_SIZE(effect_1_gentle), .play_rate_hz = 24000, .data = effect_1_gentle },
     { /* TICK */ .effect_id = 2, .length = ARRAY_SIZE(effect_2_gentle), .play_rate_hz = 24000, .data = effect_2_gentle },
     { /* THUD */ .effect_id = 3, .length = ARRAY_SIZE(effect_3_gentle), .play_rate_hz = 24000, .data = effect_3_gentle },
