@@ -1105,6 +1105,53 @@ static int qj_swap_obj(void* obj, int nwords) {
     return n;
 }
 
+// The Quick JPEG is one allocation. Walk deeper than the old 16-word window
+// but stop at the first size-gated hit, so a stray pointer to a preview
+// buffer cannot turn back into the carpet-bomb below.
+static int qj_swap_obj_first(void* obj, int nwords) {
+    obj = qj_untag(obj);
+    if (!obj || nwords <= 0) return 0;
+    uint64_t b = 0, s = 0;
+    if (!range_of((uint64_t)obj, &b, &s)) return 0;
+    int n = qj_swap_at(obj);
+    if (n) return n;
+    size_t max = (size_t)(s - ((uint64_t)obj - b)) / sizeof(void*);
+    if (max > (size_t)nwords) max = (size_t)nwords;
+    auto** w = reinterpret_cast<void**>(obj);
+    for (size_t i = 0; i < max; i++) {
+        void* v = nullptr;
+        QJ_GUARDED(b, b + s, { v = w[i]; });
+        if (v && (n = qj_swap_at(v)) != 0) return n;
+    }
+    return 0;
+}
+
+// One-shot: if the walk still misses, say what the candidates actually are.
+static void qj_census_once() {
+    static bool done = false;
+    if (done) return;
+    done = true;
+    FILE* f = fopen("/proc/self/maps", "re");
+    if (!f) return;
+    char line[512];
+    int anon = 0, dmabuf = 0, memfd = 0, other = 0;
+    while (fgets(line, sizeof(line), f)) {
+        unsigned long long lo = 0, hi = 0, off = 0, ino = 0;
+        char perms[8] = {0}, dev[16] = {0}, path[256] = {0};
+        int nf = sscanf(line, "%llx-%llx %7s %llx %15s %llu %255s", &lo, &hi, perms, &off, dev,
+                        &ino, path);
+        if (nf < 6 || perms[0] != 'r' || perms[1] != 'w') continue;
+        if (!qj_looks_quick_yuv((size_t)(hi - lo))) continue;
+        if (nf < 7 || !path[0]) anon++;
+        else if (!strncmp(path, "/dmabuf", 7)) dmabuf++;
+        else if (!strncmp(path, "/memfd:", 7)) memfd++;
+        else other++;
+    }
+    fclose(f);
+    LOGW("qj-uv census: quick-sized rw maps anon=%d dmabuf=%d memfd=%d other=%d", anon, dmabuf,
+         memfd, other);
+}
+
 // Exact-size 1280x960 YUV only. Those sizes are linear NV12, including dmabuf.
 // Off: this matches on size alone, so it also hits the preview and review
 // buffers that are on screen (1280x960 NV12 is the same 1884160 bytes). It
@@ -1151,6 +1198,8 @@ static int wrap_proc_req(void* self, bool flag, void** bufs, void* a3, int w, in
     if (qj_skip_portrait()) return rc;
     if (qj_is_quick_wh(w, h)) {
         int n = qj_swap_obj(bufs, 16) + qj_swap_obj(a3, 16);
+        if (!n) n = qj_swap_obj_first(bufs, 512);
+        if (!n) n = qj_swap_obj_first(a3, 512);
         if (!n) n = qj_swap_yuv_sized();
         LOGI(n ? "qj-uv after processOfflineRequest swapped %d"
                : "qj-uv after processOfflineRequest found no buffer",
@@ -1166,9 +1215,11 @@ static bool g_hwjpeg_hooked = false;
 
 static int wrap_hwjpeg(void* data, void* buf, int a, unsigned char b, int c, int d) {
     if (qj_skip_portrait()) return g_real_hwjpeg(data, buf, a, b, c, d);
-    int n = qj_swap_obj(buf, 16) + qj_swap_obj(data, 16);
+    int n = qj_swap_obj_first(buf, 512);
+    if (!n) n = qj_swap_obj_first(data, 512);
     if (!n) n = qj_swap_yuv_sized();
     if (n) LOGI("qj-uv before hwJpegEncodec swapped %d (d=%d)", n, d);
+    else qj_census_once();
     int rc = g_real_hwjpeg(data, buf, a, b, c, d);
     // Encode output may be the 960x1280 JPEG. Swap that one pointer only.
     int m = qj_swap_at(buf) + qj_swap_at(data);
