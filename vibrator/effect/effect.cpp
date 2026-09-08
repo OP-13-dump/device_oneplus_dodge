@@ -5,12 +5,12 @@
  * dodge (OnePlus 13) haptic profile selector — YAAP sm8650-common style.
  * Tables are keyed with AOSP Effect IDs 0-5 (perform) and 0-8 (compose
  * primitives, masked 0x8000). Profiles:
- *   richtap | crisp | gentle | op13crisp | op13gentle (default)
- * op13crisp/op13gentle are dodge stock def/soft waveforms — BOTH the perform
- * effects (effect_0..5) AND the compose primitives (stock bins mapped per this
- * device's own VibrationEffectLoader::translatePrimitiveToEffect). That covers
- * every AOSP vibration source (fingerprint, keyboard, gestures, notifications,
- * UI touch feedback) since they all route through perform() or compose().
+ *   richtap | crisp | gentle | op13crisp (default) | op13gentle
+ * op13crisp/op13gentle are dodge stock def/soft waveforms. perform() tables
+ * are keyed by AOSP IDs 0-5 but loaded from the ColorOS bins stock plays for
+ * those scenes (CLICK/TICK=2, DOUBLE_CLICK=315, THUD=1, POP=7, HEAVY_CLICK=6)
+ * so icon taps, FP confirm, and long-press match OOS. Compose primitives use
+ * the same map via primitives_op13*.
  */
 
 #include "effect.h"
@@ -31,7 +31,7 @@ const struct effect_stream* get_effect_stream(uint32_t effect_id) {
     using android::base::GetProperty;
 
     size_t i;
-    std::string profile = GetProperty("persist.sys.haptic_profile", "op13gentle");
+    std::string profile = GetProperty("persist.sys.haptic_profile", "op13crisp");
 
     if ((effect_id & 0x8000) != 0) {
         effect_id = effect_id & 0x7fff;
