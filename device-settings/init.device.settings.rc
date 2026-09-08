@@ -1,3 +1,9 @@
+# One-shot: old default was stock soft (op13gentle/op13soft). Stock OOS uses
+# def_style. Flip persist once, then leave the Settings picker alone.
+on post-fs-data && property:persist.sys.haptic_migrated_op13def=0
+    setprop persist.sys.haptic_profile op13crisp
+    setprop persist.sys.haptic_migrated_op13def 1
+
 on boot
     # Charger nodes (cool_down) are commonized in sm8750-common ueventd.oplus.rc
     # and chowned by the charger driver when the attr is created. The boot
