@@ -13,6 +13,9 @@ bluetooth.device.default_name=OnePlus 13
 # Device name
 ro.product.marketname=OnePlus 13
 
+# LRA period 7692 us (oplus-misc-23821.dtsi) → ~130 Hz
+ro.vendor.vibrator.lra_freq_hz=130
+
 # Graphics
 # Dev options "Show refresh rate" reads the real panel rate from the DDIC
 # test-TE counter (device-settings enables the irq at boot); kernel ADFR
