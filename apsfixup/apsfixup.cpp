@@ -1254,6 +1254,38 @@ static int wrap_dumpqj(void* self, void* data, int n) {
     return rc;
 }
 
+// Video-snapshot stills are encoded by sw_jpeg_enc, not hwJpegEncodec. The APS
+// copy of the recording frame is tagged 0x23 but its chroma is VU-ordered, and
+// swJpegWriteYUVData takes the order from the tag alone (0x23 UV, 0x11 VU).
+// Retag for the call; no pixels are touched.
+typedef long (*swenc_t)(void*, unsigned char*, int, unsigned long*, void*, int, int);
+static swenc_t g_real_swenc = nullptr;
+static bool g_swenc_hooked = false;
+
+struct ApsJpegInImageHead {
+    int32_t format;
+    int32_t width;
+    int32_t height;
+};
+
+static bool swenc_is_video_wh(int w, int h) {
+    int lo = w < h ? w : h, hi = w < h ? h : w;
+    return (hi == 1280 && lo == 720) || (hi == 1920 && lo == 1080) ||
+           (hi == 3840 && lo == 2160) || (hi == 7680 && lo == 4320);
+}
+
+static long wrap_swenc(void* img, unsigned char* out, int cap, unsigned long* len, void* exif,
+                       int cs, int jcs) {
+    auto* in = static_cast<ApsJpegInImageHead*>(img);
+    if (!in || in->format != 0x23 || !swenc_is_video_wh(in->width, in->height))
+        return g_real_swenc(img, out, cap, len, exif, cs, jcs);
+    in->format = 0x11;
+    long rc = g_real_swenc(img, out, cap, len, exif, cs, jcs);
+    in->format = 0x23;
+    LOGI("sw-jpeg %dx%d encoded as VU", in->width, in->height);
+    return rc;
+}
+
 static void write_abs_jump(void* at, void* dest) {
     uint32_t* i = (uint32_t*)at;
     i[0] = 0x58000050;
@@ -1305,6 +1337,13 @@ static bool hook_dumpqj() {
         (void*)wrap_dumpqj, (void**)&g_real_dumpqj, &g_dumpqj_hooked);
 }
 
+static bool hook_swenc() {
+    return hook_one(
+        "_ZN7android14sw_encode_dataEPNS_14APSJpegInImageEPhiPmP11APSExifData13ApsColorSpace"
+        "13J_COLOR_SPACE",
+        (void*)wrap_swenc, (void**)&g_real_swenc, &g_swenc_hooked);
+}
+
 static void try_install() {
     uint64_t base;
 
@@ -1343,6 +1382,7 @@ static void try_install() {
     hook_proc_req();
     hook_hwjpeg();
     hook_dumpqj();
+    hook_swenc();
     patch_cached_tfrsn();
     qj_guard_refresh();
 }
