@@ -91,6 +91,13 @@ PRODUCT_COPY_FILES += \
 $(call soong_config_set_bool,OPLUS_LINEAGE_TOUCH_HAL,ENABLE_GM,true)
 $(call soong_config_set_bool,OPLUS_LINEAGE_TOUCH_HAL,ENABLE_HTPR,false)
 
+# Vibrator
+PRODUCT_PACKAGES += \
+    vendor.qti.hardware.vibrator.service.oplus_sm8750
+
+PRODUCT_COPY_FILES += \
+    device/oneplus/sm8750-common/vibrator/excluded-input-devices.xml:$(TARGET_COPY_OUT_VENDOR)/etc/excluded-input-devices.xml
+
 # Vibrator (YAAP sm8650-common style profiles)
 # sm8750-common QTI HAL + dodge effect lib. Profiles via persist.sys.haptic_profile:
 #   richtap | crisp | gentle | op13crisp (default) | op13gentle
