@@ -7,6 +7,7 @@ git clone -b 16.2 https://github.com/OP-13-dump/kernel_oneplus_sm8750-modules ke
 git clone -b 16.2 https://github.com/OP-13-dump/kernel_oneplus_sm8750-devicetrees kernel/oneplus/sm8750-devicetrees
 git clone -b 16.2 https://gitlab.com/osm1019/vendor_oplus_fusionlight.git vendor/oplus/fusionlight
 git clone -b 16.2 https://github.com/OP-13-dump/vendor_oneplus_ir vendor/oneplus/ir
+git clone -b 16.2 https://github.com/OP-13-dump/patches.git patches
 
 # Sign keys
 git clone -b 16.2 https://github.com/Lunaris-AOSP/vendor_lunaris-priv_keys.git vendor/lunaris-priv/keys
@@ -41,5 +42,32 @@ case "$choice" in
         ;;
     *)
         echo "Skipping dodge hardware/oplus & vendor/oplus/camera repos."
+        ;;
+esac
+
+echo ""
+if [ -c /dev/tty ]; then
+    read -p "Apply source-side patches? (y/n) [default: y]: " patch_choice < /dev/tty
+else
+    read -p "Apply source-side patches? (y/n) [default: y]: " patch_choice
+fi
+
+case "$patch_choice" in
+    [yY]*|"")
+        PATCH_SCRIPT="patches/apply.sh"
+        if [ ! -f "$PATCH_SCRIPT" ]; then
+            TOP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")/../../.." && pwd)"
+            PATCH_SCRIPT="$TOP_DIR/patches/apply.sh"
+        fi
+
+        if [ -f "$PATCH_SCRIPT" ]; then
+            echo "Applying source-side patches..."
+            bash "$PATCH_SCRIPT"
+        else
+            echo "patches/apply.sh not found!"
+        fi
+        ;;
+    *)
+        echo "Skipping source-side patches."
         ;;
 esac
