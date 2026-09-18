@@ -284,8 +284,8 @@
     <string name="vibration_category_title">Vibration &amp; Haptics</string>
     <string name="haptic_profile_title">Haptic profile</string>
     <string name="haptic_profile_summary">Select haptic feedback waveform profile</string>
-    <string name="haptic_profile_op13gentle">OnePlus 13 Gentle (Soft - Default)</string>
-    <string name="haptic_profile_op13crisp">OnePlus 13 Crisp (Stock)</string>
+    <string name="haptic_profile_op13gentle">OnePlus 13 Gentle (Soft)</string>
+    <string name="haptic_profile_op13crisp">OnePlus 13 Crisp (Stock - Default)</string>
     <string name="haptic_profile_yaap_gentle">YAAP Gentle</string>
     <string name="haptic_profile_yaap_crisp">YAAP Crisp</string>
     <string name="haptic_profile_richtap">RichTap Standard</string>

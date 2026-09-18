@@ -104,8 +104,7 @@ PRODUCT_PACKAGES += \
     libqtivibratoreffect.oplus.dodge
 
 PRODUCT_PRODUCT_PROPERTIES += \
-    persist.sys.haptic_profile=op13crisp \
-    persist.sys.haptic_migrated_op13def=0
+    persist.sys.haptic_profile=op13crisp
 
 # Inherit from the common OEM chipset makefile.
 $(call inherit-product, device/oneplus/sm8750-common/common.mk)
