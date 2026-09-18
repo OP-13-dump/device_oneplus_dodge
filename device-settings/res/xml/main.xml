@@ -110,7 +110,7 @@
             android:dialogTitle="@string/haptic_profile_title"
             android:entries="@array/haptic_profile_entries"
             android:entryValues="@array/haptic_profile_values"
-            android:defaultValue="op13gentle"
+            android:defaultValue="op13crisp"
             android:summary="%s" />
 
     </PreferenceCategory>
