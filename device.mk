@@ -108,8 +108,7 @@ PRODUCT_PACKAGES += \
     libqtivibratoreffect.oplus.dodge
 
 PRODUCT_PRODUCT_PROPERTIES += \
-    persist.sys.haptic_profile=op13crisp \
-    persist.sys.haptic_migrated_op13def=0
+    persist.sys.haptic_profile=op13crisp
 
 # ProXDR / HDR photo pipeline.
 #

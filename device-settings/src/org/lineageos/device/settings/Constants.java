@@ -200,5 +200,5 @@ public class Constants {
     /* Haptic profile */
     public static final String KEY_HAPTIC_PROFILE = "haptic_profile";
     public static final String PROP_HAPTIC_PROFILE = "persist.sys.haptic_profile";
-    public static final String HAPTIC_PROFILE_DEFAULT = "op13gentle";
+    public static final String HAPTIC_PROFILE_DEFAULT = "op13crisp";
 }
