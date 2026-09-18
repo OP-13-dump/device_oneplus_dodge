@@ -150,6 +150,11 @@ public class DeviceSettings extends SettingsBasePreferenceFragment
             mChargingSpeedPref.setValue(mFastChargeController.getChargingSpeedMode());
             mChargingSpeedPref.setSummary(mChargingSpeedPref.getEntry());
         }
+        if (mHapticProfilePref != null) {
+            String currentProfile = SystemProperties.get(Constants.PROP_HAPTIC_PROFILE, Constants.HAPTIC_PROFILE_DEFAULT);
+            mHapticProfilePref.setValue(currentProfile);
+            mHapticProfilePref.setSummary(mHapticProfilePref.getEntry());
+        }
     }
 
     /**
