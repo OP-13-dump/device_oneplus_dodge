@@ -1234,6 +1234,30 @@ static int qj_wide_scan(const char* why) {
     return done;
 }
 
+// dumpQuickJpegIfNeed runs while both 16:9 buffers are still mapped, so the
+// exactly-one rule cannot pick one yet. The transient twin is unmapped ~0.4s
+// in and the review buffer lives to ~2.9s; retry once rather than swap both.
+static bool g_wide_late_busy = false;
+
+static void* qj_wide_late_fn(void*) {
+    struct timespec ts = {0, 300L * 1000 * 1000};
+    nanosleep(&ts, nullptr);
+    qj_wide_scan("late");
+    g_wide_late_busy = false;
+    return nullptr;
+}
+
+static void qj_wide_late_arm() {
+    if (g_wide_late_busy) return;
+    g_wide_late_busy = true;
+    pthread_t t;
+    if (pthread_create(&t, nullptr, qj_wide_late_fn, nullptr) != 0) {
+        g_wide_late_busy = false;
+        return;
+    }
+    pthread_detach(t);
+}
+
 static int qj_swap_obj(void* obj, int nwords) {
     obj = qj_untag(obj);
     if (!obj || nwords <= 0) return 0;
@@ -1399,7 +1423,7 @@ static int wrap_dumpqj(void* self, void* data, int n) {
     // 16:9 only. Every other ratio paints its review correctly already, and
     // swapping a correct buffer is what tinted them. The quick file is on disk
     // by the time this returns, so swapping here cannot invert it.
-    if (g_quick_h == 720) qj_wide_scan("dumpqj");
+    if (g_quick_h == 720 && !qj_wide_scan("dumpqj")) qj_wide_late_arm();
     return rc;
 }
 
