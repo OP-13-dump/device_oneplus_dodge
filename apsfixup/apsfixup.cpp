@@ -805,6 +805,31 @@ static bool qj_is_quick_wh(int w, int h) {
     return (w == 960 && h == 1280) || (w == 1280 && h == 960);
 }
 
+// Quick JPEG is 1280 on the long side; the short side follows the aspect ratio
+// (960 4:3, 720 16:9, 1280 1:1, 582 and 472 on the wide ones). Y scanlines are
+// padded up to a multiple of 64, so UV starts at 1280*align(h,64) -- only 4:3
+// has that equal to w*h, which is why the old 1280x960 path works there.
+static int g_quick_h = 0;
+
+static void qj_note_quick_h(int w, int h) {
+    int lo = w < h ? w : h, hi = w < h ? h : w;
+    if (hi == 1280 && lo >= 256 && lo <= 1280) g_quick_h = lo;
+}
+
+static size_t qj_align(size_t v, size_t a) { return (v + a - 1) / a * a; }
+
+// Wide-ratio buffers only. 4:3 keeps its existing exact-size path untouched.
+static bool qj_wide_split(size_t mapsz, size_t* out_ysz) {
+    int h = g_quick_h;
+    if (h <= 0 || h == 960) return false;
+    size_t ysz = 1280 * qj_align((size_t)h, 64);
+    size_t uv_exact = 1280 * (size_t)((h + 1) / 2);
+    size_t uv_pad = 1280 * qj_align((size_t)((h + 1) / 2), 64);
+    if (mapsz != ysz + uv_exact && mapsz != ysz + uv_pad) return false;
+    *out_ysz = ysz;
+    return true;
+}
+
 static bool qj_looks_quick_yuv(size_t sz) {
     return sz == 1843200 || sz == 1884160 || sz == 1847296 || sz == 1867776;
 }
@@ -823,6 +848,31 @@ static bool qj_yuv_already(uint64_t p) {
 static void qj_yuv_remember(uint64_t p) {
     g_yuv_done[g_yuv_n % 32] = p;
     g_yuv_n++;
+}
+
+static bool qj_swap_nv12_at(unsigned char* p, size_t ysz, size_t avail) {
+    if (!p || avail < ysz + ysz / 2) return false;
+    if (p[0] == 0xFF && p[1] == 0xD8) return false;
+    unsigned char* c = p + ysz;
+    size_t uv = ysz / 2;
+    int nz = 0;
+    for (size_t i = 0; i < 256 && i < uv; i++)
+        if (c[i] != 0) nz++;
+    if (nz < 8) return false;
+    qj_uv_lock();
+    if (qj_yuv_already((uint64_t)p)) {
+        qj_uv_unlock();
+        return false;
+    }
+    for (size_t i = 0; i + 1 < uv; i += 2) {
+        unsigned char t = c[i];
+        c[i] = c[i + 1];
+        c[i + 1] = t;
+    }
+    qj_yuv_remember((uint64_t)p);
+    qj_uv_unlock();
+    LOGI("qj-uv swapped wide NV12 ysz=%zu at %p avail=%zu", ysz, p, avail);
+    return true;
 }
 
 static bool qj_swap_nv12(unsigned char* p, int w, int h, size_t avail) {
@@ -1080,7 +1130,8 @@ static int qj_swap_at(void* p) {
         } else if (avail <= (2u << 20) && q[0] == 0xFF && q[1] == 0xD8 && q[2] == 0xFF) {
             // Thumbnail JPEG only (not the 24MB still BLOB, not a giant GPU mapping).
             int w = 0, h = 0;
-            if (qj_sof(q, avail, &w, &h) && qj_is_quick_wh(w, h)) {
+            if (qj_sof(q, avail, &w, &h)) qj_note_quick_h(w, h);
+            if (w && h && qj_is_quick_wh(w, h)) {
                 qj_uv_lock();
                 bool ok = qj_swap_jpeg_uv(q, avail);
                 qj_uv_unlock();
@@ -1088,6 +1139,26 @@ static int qj_swap_at(void* p) {
             }
         }
     });
+    return n;
+}
+
+// Wide ratios only, and only ever called after the JPEG has been encoded: the
+// file comes out correct already, it is the buffer the review paints from that
+// holds VU. Swapping before the encode would invert the saved Quick JPEG.
+static int qj_wide_at(void* p) {
+    if (qj_skip_portrait()) return 0;
+    p = qj_untag(p);
+    if (!p) return 0;
+    uint64_t b = 0, s = 0;
+    char perms[5] = {0};
+    if (!range_of_perms((uint64_t)p, &b, &s, perms)) return 0;
+    if (perms[0] != 'r' || perms[1] != 'w') return 0;
+    size_t avail = (size_t)(s - ((uint64_t)p - b));
+    size_t ysz = 0;
+    if (!qj_wide_split(avail, &ysz) && !qj_wide_split(s, &ysz)) return 0;
+    auto* q = reinterpret_cast<unsigned char*>(p);
+    int n = 0;
+    QJ_GUARDED(b, b + s, { n = qj_swap_nv12_at(q, ysz, avail) ? 1 : 0; });
     return n;
 }
 
@@ -1206,6 +1277,7 @@ static bool g_proc_req_hooked = false;
 static int wrap_proc_req(void* self, bool flag, void** bufs, void* a3, int w, int h) {
     int rc = g_real_proc_req(self, flag, bufs, a3, w, h);
     if (qj_skip_portrait()) return rc;
+    qj_note_quick_h(w, h);
     if (qj_is_quick_wh(w, h)) {
         int n = qj_swap_obj(bufs, 16) + qj_swap_obj(a3, 16);
         if (!n) n = qj_swap_obj_first(bufs, 512);
@@ -1234,6 +1306,7 @@ static int wrap_hwjpeg(void* data, void* buf, int a, unsigned char b, int c, int
     int rc = g_real_hwjpeg(data, buf, a, b, c, d);
     // Encode output may be the 960x1280 JPEG. Swap that one pointer only.
     int m = qj_swap_at(buf) + qj_swap_at(data);
+    if (!m) m = qj_wide_at(buf) + qj_wide_at(data);
     if (m) LOGI("qj-uv after hwJpegEncodec swapped %d jpeg/yuv", m);
     return rc;
 }
