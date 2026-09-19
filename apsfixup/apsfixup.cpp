@@ -1379,7 +1379,6 @@ static int wrap_hwjpeg(void* data, void* buf, int a, unsigned char b, int c, int
     // Encode output may be the 960x1280 JPEG. Swap that one pointer only.
     int m = qj_swap_at(buf) + qj_swap_at(data);
     if (!m) m = qj_wide_at(buf) + qj_wide_at(data);
-    if (!m) m = qj_wide_scan("hwjpeg");
     if (m) LOGI("qj-uv after hwJpegEncodec swapped %d jpeg/yuv", m);
     return rc;
 }
@@ -1397,10 +1396,10 @@ static int wrap_dumpqj(void* self, void* data, int n) {
     // without dirent.h — open common path if we can find it via maps? Skip
     // the dir walk; qj_swap_at on `data` covers the in-memory JPEG.
     qj_swap_obj(data, 16);
-    // The quick file is on disk by now, so the buffer the review paints from
-    // can be un-swapped without inverting it. hwJpegEncodec is 2s too late:
-    // it runs as the buffer is being torn down, after the tint has shown.
-    qj_wide_scan("dumpqj");
+    // 16:9 only. Every other ratio paints its review correctly already, and
+    // swapping a correct buffer is what tinted them. The quick file is on disk
+    // by the time this returns, so swapping here cannot invert it.
+    if (g_quick_h == 720) qj_wide_scan("dumpqj");
     return rc;
 }
 
