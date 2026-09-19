@@ -813,7 +813,9 @@ static int g_quick_h = 0;
 
 static void qj_note_quick_h(int w, int h) {
     int lo = w < h ? w : h, hi = w < h ? h : w;
-    if (hi == 1280 && lo >= 256 && lo <= 1280) g_quick_h = lo;
+    if (hi != 1280 || lo < 256 || lo > 1280) return;
+    if (lo != g_quick_h) LOGI("qj-uv quick_h=%d", lo);
+    g_quick_h = lo;
 }
 
 static size_t qj_align(size_t v, size_t a) { return (v + a - 1) / a * a; }
@@ -1162,6 +1164,76 @@ static int qj_wide_at(void* p) {
     return n;
 }
 
+// The review buffer is not reachable from the encode arguments, so find it by
+// shape instead: stride 1280, Y rows padded to 64, one solution per size.
+static bool qj_wide_shape(size_t mapsz, size_t* out_ysz) {
+    // Short side is 256..1280, so the whole buffer can only be this big.
+    if (mapsz < 1280 * (256 + 128) || mapsz > 2457600) return false;
+    if (mapsz % 1280) return false;
+    size_t rows = mapsz / 1280, hit = 0;
+    int n = 0;
+    for (size_t y = 128; y + 64 <= rows; y += 64) {
+        size_t uv = rows - y, half = (y + 1) / 2;
+        if (uv != half && uv != qj_align(half, 64)) continue;
+        hit = y;
+        n++;
+    }
+    // 960 rows is 4:3; qj_swap_yuv_sized owns that one.
+    if (n != 1 || hit == 960) return false;
+    *out_ysz = 1280 * hit;
+    return true;
+}
+
+// Acts only when exactly one mapping matches, same discipline as
+// qj_swap_yuv_sized: with more than one there is no telling the review buffer
+// from one that is on screen, and swapping them all is the post-shutter flash.
+static int qj_wide_scan(const char* why) {
+    if (qj_skip_portrait()) return 0;
+    FILE* f = fopen("/proc/self/maps", "re");
+    if (!f) return 0;
+    char line[512];
+    int n = 0;
+    unsigned long long cand_lo = 0, cand_hi = 0;
+    size_t cand_sz = 0, cand_ysz = 0;
+    while (fgets(line, sizeof(line), f)) {
+        unsigned long long lo = 0, hi = 0, off = 0, ino = 0;
+        char perms[8] = {0}, dev[16] = {0}, path[256] = {0};
+        int nf = sscanf(line, "%llx-%llx %7s %llx %15s %llu %255s", &lo, &hi, perms, &off, dev,
+                        &ino, path);
+        if (nf < 6 || perms[0] != 'r' || perms[1] != 'w') continue;
+        if (nf == 7 && path[0] == '/' && strncmp(path, "/dmabuf", 7) != 0 &&
+            strncmp(path, "/memfd:", 7) != 0)
+            continue;
+        size_t sz = (size_t)(hi - lo), ysz = 0;
+        if (g_quick_h > 0 && g_quick_h != 960) {
+            if (!qj_wide_split(sz, &ysz)) continue;
+        } else if (nf < 7 || path[0] != '/' || !qj_wide_shape(sz, &ysz)) {
+            // Without dimensions from the caller, shape alone is too loose for
+            // the heap -- a scudo block hits it. The review buffer is a dmabuf.
+            continue;
+        }
+        if (!n) {
+            cand_lo = lo;
+            cand_hi = hi;
+            cand_sz = sz;
+            cand_ysz = ysz;
+        }
+        n++;
+    }
+    fclose(f);
+    int done = 0;
+    if (n == 1) {
+        auto* p = reinterpret_cast<unsigned char*>(static_cast<uintptr_t>(cand_lo));
+        QJ_GUARDED(cand_lo, cand_hi, { done = qj_swap_nv12_at(p, cand_ysz, cand_sz) ? 1 : 0; });
+    }
+    static int noisy = 20;
+    if (n || done || noisy > 0) {
+        if (!n && !done) noisy--;
+        LOGI("qj-uv wide %s: h=%d cand=%d swapped=%d", why, g_quick_h, n, done);
+    }
+    return done;
+}
+
 static int qj_swap_obj(void* obj, int nwords) {
     obj = qj_untag(obj);
     if (!obj || nwords <= 0) return 0;
@@ -1307,6 +1379,7 @@ static int wrap_hwjpeg(void* data, void* buf, int a, unsigned char b, int c, int
     // Encode output may be the 960x1280 JPEG. Swap that one pointer only.
     int m = qj_swap_at(buf) + qj_swap_at(data);
     if (!m) m = qj_wide_at(buf) + qj_wide_at(data);
+    if (!m) m = qj_wide_scan("hwjpeg");
     if (m) LOGI("qj-uv after hwJpegEncodec swapped %d jpeg/yuv", m);
     return rc;
 }
@@ -1324,6 +1397,10 @@ static int wrap_dumpqj(void* self, void* data, int n) {
     // without dirent.h — open common path if we can find it via maps? Skip
     // the dir walk; qj_swap_at on `data` covers the in-memory JPEG.
     qj_swap_obj(data, 16);
+    // The quick file is on disk by now, so the buffer the review paints from
+    // can be un-swapped without inverting it. hwJpegEncodec is 2s too late:
+    // it runs as the buffer is being torn down, after the tint has shown.
+    qj_wide_scan("dumpqj");
     return rc;
 }
 
