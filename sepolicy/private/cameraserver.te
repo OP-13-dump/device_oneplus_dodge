@@ -1,0 +1,10 @@
+# Qualcomm camera libraries in cameraserver map anonymous
+# executable pages (JIT / GPU shaders). Without this, the HAL
+# retries every ~1s:
+#   avc: denied { execmem } for
+#     scontext=u:r:cameraserver:s0
+#     tcontext=u:r:cameraserver:s0
+#     tclass=process
+# That loop showed up as ~24% CPU (mostly kernel) after boot.
+
+allow cameraserver self:process execmem;
