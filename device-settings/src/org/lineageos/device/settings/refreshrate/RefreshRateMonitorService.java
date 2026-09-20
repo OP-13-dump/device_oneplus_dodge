@@ -34,12 +34,14 @@ public class RefreshRateMonitorService extends Service {
     private ForegroundAppDetector mForegroundDetector;
     private boolean mAppMonitoringActive = false;
 
-    // "auto" = full dynamic range: let SurfaceFlinger range across 60/90/120 by
-    // content while the kernel ADFR self-refresh drops the DDIC to 20/1 beneath.
-    // Panel max is 120 on dodge (1440p and 1080p timings). Defining auto explicitly (instead of restoring the
-    // user's Android "Smooth display" baseline, which is often 60) is what keeps
-    // auto from welding the ceiling to 60Hz.
-    private static final float AUTO_MIN_REFRESH_RATE = 60f;
+    // "auto" = full dynamic range: peak 120 so SF can pick 90/120 by content,
+    // min 1 so the render vote does not keep compositing at 60 fps while ADFR
+    // already dropped the DDIC to 1 Hz. A 60 Hz floor was welding idle SF to
+    // 60 fps and keeping the SoC warm on a static screen.
+    // Panel max is 120 on dodge (1440p and 1080p timings). Defining peak
+    // explicitly (instead of restoring the user's Android "Smooth display"
+    // baseline, which is often 60) is what keeps auto from welding the ceiling.
+    private static final float AUTO_MIN_REFRESH_RATE = 1f;
     private static final float AUTO_PEAK_REFRESH_RATE = 120f;
 
     // ===== Lifecycle =====
@@ -185,8 +187,8 @@ public class RefreshRateMonitorService extends Service {
         int minFps = ltpo ? 0 : 120;
         FileUtils.writeLine(Constants.NODE_ADFR_MIN_FPS, String.valueOf(minFps));
 
-        // fps == 0 (auto): open SF to the full 60..120 range so it can pick the mode
-        // by content. fps > 0 (fixed): lock SF to that single mode (MIN == PEAK).
+        // fps == 0 (auto): open SF to 1..120 so it can idle the compositor.
+        // fps > 0 (fixed): lock SF to that single mode (MIN == PEAK).
         final float minRate = (fps == 0) ? AUTO_MIN_REFRESH_RATE : (float) fps;
         final float peakRate = (fps == 0) ? AUTO_PEAK_REFRESH_RATE : (float) fps;
 
