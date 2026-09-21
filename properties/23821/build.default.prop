@@ -6,3 +6,7 @@ ro.vendor.oplus.regionmark=CN
 
 # NFC
 persist.vendor.nfc.config_file_name=libnfc-mtp-SN220.conf_23821
+
+# AI pipeline
+ro.oplus.pipeline.region=CN
+ro.oplus.pipeline_key=CN

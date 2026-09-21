@@ -26,3 +26,5 @@ ro.vendor.oplus.regionmark=ROW
 # Still only a default -- /data/property wins, so it survives:
 #     setprop persist.sys.oplus.region <REGION>
 persist.sys.oplus.region=US
+ro.oplus.pipeline.region=ROW
+ro.oplus.pipeline_key=ROW
