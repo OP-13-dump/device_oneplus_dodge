@@ -5,3 +5,7 @@ ro.vendor.oplus.radio.esim.feature=2
 
 # NFC
 persist.vendor.nfc.config_file_name=libnfc-mtp-SN220.conf_23893
+
+# AI pipeline fallback
+ro.oplus.pipeline.region?=EUEX
+ro.oplus.pipeline_key?=EUEX
