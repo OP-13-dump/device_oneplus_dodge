@@ -141,6 +141,8 @@ blob_fixups: blob_fixups_user_type = {
         .regex_replace('    delete_recursion', '    #delete_recursion'),
     'odm/firmware/fastchg/23821/charging_hyper_mode_config.txt': blob_fixup()
         .regex_replace(r"(PROJECT:=)23893", r"\g<1>23821"),
+    'odm/firmware/fastchg/battery_damage_config.json': blob_fixup()
+        .regex_replace(r'"volt_diff_abnormal_leak": 1', r'"volt_diff_abnormal_leak": 0'),
     'odm/lib64/libAlgoProcess.so': blob_fixup()
         .replace_needed('android.hardware.graphics.common-V5-ndk.so', 'android.hardware.graphics.common-V7-ndk.so')
         # APS turbo soft/GREEN/crash is now fixed at RUNTIME by libapsfixup.so
