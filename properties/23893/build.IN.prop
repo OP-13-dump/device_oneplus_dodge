@@ -2,3 +2,5 @@ ro.product.odm.model=CPH2649
 ro.product.odm.name=CPH2649IN
 ro.vendor.oplus.regionmark=IN
 ro.vendor.oplus.radio.sar_regionmark=IN
+ro.oplus.pipeline.region=IN
+ro.oplus.pipeline_key=IN
