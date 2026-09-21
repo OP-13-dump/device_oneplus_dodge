@@ -30,6 +30,7 @@
 #include <android/log.h>
 #include <dlfcn.h>
 #include <elf.h>
+#include <errno.h>
 #include <fcntl.h>
 #include <inttypes.h>
 #include <link.h>
@@ -1293,8 +1294,14 @@ static void write_abs_jump(void* at, void* dest) {
     memcpy(i + 2, &dest, sizeof(dest));
 }
 
+static bool g_execmem_denied = false;
+
 static bool hook_one(const char* name, void* wrap, void** real_out, bool* done) {
     if (*done) return true;
+    if (g_execmem_denied) {
+        *done = true;
+        return false;
+    }
     void* h = dlopen("libAlgoProcess.so", RTLD_NOLOAD);
     if (!h) h = dlopen("libAlgoProcess.so", RTLD_NOW);
     if (!h) return false;
@@ -1305,13 +1312,29 @@ static bool hook_one(const char* name, void* wrap, void** real_out, bool* done) 
     }
     uint8_t* thunk = (uint8_t*)mmap(nullptr, 4096, PROT_READ | PROT_WRITE | PROT_EXEC,
                                     MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-    if (thunk == MAP_FAILED) return false;
+    if (thunk == MAP_FAILED) {
+        if (errno == EACCES || errno == EPERM) {
+            LOGW("mmap PROT_EXEC denied (execmem not allowed), disabling inline hooks");
+            g_execmem_denied = true;
+            *done = true;
+        }
+        return false;
+    }
     memcpy(thunk, target, 16);
     write_abs_jump(thunk + 16, (char*)target + 16);
     *real_out = thunk;
 
     uintptr_t page = (uintptr_t)target & ~(uintptr_t)0xfff;
-    if (mprotect((void*)page, 0x2000, PROT_READ | PROT_WRITE | PROT_EXEC) != 0) return false;
+    if (mprotect((void*)page, 0x2000, PROT_READ | PROT_WRITE | PROT_EXEC) != 0) {
+        if (errno == EACCES || errno == EPERM) {
+            LOGW("mprotect PROT_EXEC denied (execmem not allowed), disabling inline hooks");
+            g_execmem_denied = true;
+            *done = true;
+        }
+        munmap(thunk, 4096);
+        *real_out = nullptr;
+        return false;
+    }
     write_abs_jump(target, wrap);
     __builtin___clear_cache((char*)target, (char*)target + 16);
     *done = true;
@@ -1390,6 +1413,12 @@ static void try_install() {
 static void* poller(void*) {
     for (int i = 0; i < 24000; i++) {
         try_install();
+        if (g_execmem_denied) {
+            g_proc_req_hooked = true;
+            g_hwjpeg_hooked = true;
+            g_dumpqj_hooked = true;
+            g_swenc_hooked = true;
+        }
         uint64_t fusion = 0;
         bool have_fusion = module_base("libarcsoft_turbo_fusion_raw_super_night.so", &fusion);
         if (g_p010_done && g_dlsym_iface_done && g_dlsym_proc_done && g_proc_req_hooked &&
@@ -1405,6 +1434,11 @@ static void* poller(void*) {
 }
 
 __attribute__((constructor)) static void apsfixup_init() {
+    const char* prog = getprogname();
+    if (prog && strstr(prog, "cameraserver")) {
+        LOGI("libapsfixup loaded in cameraserver (pid %d); skipping (not an algo process)", getpid());
+        return;
+    }
     LOGI("libapsfixup loaded (pid %d) RAW/HDR/DCIR wrap, TFRSN, qj-uv", getpid());
     try_install();
     pthread_t t;
