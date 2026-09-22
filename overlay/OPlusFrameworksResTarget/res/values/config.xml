@@ -8,6 +8,10 @@
          Software implementation will be used if config_hardware_auto_brightness_available is not set -->
     <bool name="config_automatic_brightness_available">true</bool>
 
+    <!-- Power Management: Specifies whether to decouple the auto-suspend state of the
+         device from the display on/off state. -->
+    <bool name="config_powerDecoupleAutoSuspendModeFromDisplay">true</bool>
+
     <!-- Vibrator pattern for feedback about a long screen/key press -->
     <integer-array name="config_longPressVibePattern">
         <item>0</item>
@@ -31,7 +35,8 @@
          -2 is invalid so setting will resort to int value specified above.
          Set this to 0.0 to allow screen to go to minimal brightness.
          The user is forbidden from setting the brightness below this level. -->
-    <item type="dimen" name="config_screenBrightnessSettingMinimumFloat">0.001465559</item>
+    <!-- Stock table min level 8 = 8/4094; rounded: level 6 / 4094 -->
+    <item type="dimen" name="config_screenBrightnessSettingMinimumFloat">0.001954079</item>
 
     <!-- Maximum screen brightness allowed by the power manager.
          -2 is invalid so setting will resort to int value specified above.
@@ -39,13 +44,284 @@
          The user is forbidden from setting the brightness above this level. -->
     <item type="dimen" name="config_screenBrightnessSettingMaximumFloat">1.0</item>
 
+    <!-- Default screen brightness setting set.
+         -2 is invalid so setting will resort to int value specified above.
+         Must be in the range specified by minimum and maximum. -->
+    <!-- Stock default brightness level 1433 (oplus,dsi-brightness-default-level)
+         = 1433/4094 -->
+    <item type="dimen" name="config_screenBrightnessSettingDefaultFloat">0.35002443</item>
+
+    <!-- Stability requirements in milliseconds for accepting a new brightness level.  This is used
+         for debouncing the light sensor.  Different constants are used to debounce the light sensor
+         when adapting to brighter or darker environments.  This parameter controls how quickly
+         brightness changes occur in response to an observed change in light level that exceeds the
+         hysteresis threshold. -->
+    <!-- displayconfig.xml <autoBrightness> overrides these; kept in sync with it -->
+    <integer name="config_autoBrightnessBrighteningLightDebounce">1000</integer>
+    <integer name="config_autoBrightnessDarkeningLightDebounce">4000</integer>
+
     <!-- Light sensor event rate in milliseconds for automatic brightness control. -->
     <integer name="config_autoBrightnessLightSensorRate">200</integer>
+
+    <!-- Manual brightness in auto mode is session-only: forgotten on lock.
+
+         The adaptive short-term model records a manual slider set as a
+         (lux -> brightness) point and warps the auto curve toward it. Stock AOSP
+         keeps that point at a similar ambient lux even after its timeout — it is
+         only cleared once the light changes past anchor*0.6 — so a manual min
+         "sticks" across lock/unlock in unchanged light and never ramps back.
+
+         config_autoBrightnessResetShortTermModelOnScreenOff makes the timeout do
+         a FULL reset instead of a mere invalidate, so any screen-off clears the
+         manual set unconditionally. The timeout is scheduled only on the
+         transition to a non-interactive policy and is cancelled the instant the
+         screen comes back on, so it NEVER counts during active use — meaning 0 is
+         safe and correct here: it fires on the very first non-interactive frame,
+         so even a sub-second lock/unlock (which a 2000ms value missed) forgets the
+         manual set and unlock returns to the auto curve. -->
+    <integer name="config_autoBrightnessShortTermModelTimeout">0</integer>
+    <bool name="config_autoBrightnessResetShortTermModelOnScreenOff">true</bool>
 
     <!-- Screen brightness used to dim the screen when the user activity
          timeout expires.  May be less than the minimum allowed brightness setting
          that can be set by the user. -->
-    <item type="dimen" name="config_screenBrightnessDimFloat">0.0</item>
+    <item name="config_screenBrightnessDimFloat" format="float" type="dimen">0.1</item>
+
+    <!-- Screen brightness used to dim the screen while dozing in a very low power state.
+         May be less than the minimum allowed brightness setting
+         that can be set by the user. -->
+    <integer name="config_screenBrightnessDoze">128</integer>
+    <item name="config_screenBrightnessDozeFloat" format="float" type="dimen">0.5</item>
+
+    <!-- Array of light sensor lux values to define our levels for auto backlight brightness support.
+         The N entries of this array define N + 1 control points as follows:
+         (1-based arrays)
+
+         Point 1:            (0, value[1]):             lux <= 0
+         Point 2:     (level[1], value[2]):  0        < lux <= level[1]
+         Point 3:     (level[2], value[3]):  level[2] < lux <= level[3]
+         ...
+         Point N+1: (level[N], value[N+1]):  level[N] < lux
+
+         The control points must be strictly increasing.  Each control point
+         corresponds to an entry in the brightness backlight values arrays.
+         For example, if lux == level[1] (first element of the levels array)
+         then the brightness will be determined by value[2] (second element
+         of the brightness values array).
+
+         Spline interpolation is used to determine the auto-brightness
+         backlight values for lux levels between these control points.
+
+         Must be overridden in platform specific overlays -->
+    <!-- Stock OOS lux curve for this panel: lux_table id 31 ("Waffle") from
+         dodge_imgs system_ext/etc/display_brightness_config_common.xml, selected
+         by lux_table_mode in my_product/vendor/etc/display_brightness_config_P_3.xml. -->
+    <integer-array name="config_autoBrightnessLevels">
+        <item>2</item>
+        <item>4</item>
+        <item>6</item>
+        <item>8</item>
+        <item>10</item>
+        <item>15</item>
+        <item>20</item>
+        <item>25</item>
+        <item>30</item>
+        <item>40</item>
+        <item>60</item>
+        <item>95</item>
+        <item>100</item>
+        <item>200</item>
+        <item>300</item>
+        <item>400</item>
+        <item>500</item>
+        <item>1000</item>
+        <item>1100</item>
+        <item>1200</item>
+        <item>1300</item>
+        <item>1400</item>
+        <item>1500</item>
+        <item>1600</item>
+        <item>1700</item>
+        <item>1800</item>
+        <item>1900</item>
+        <item>2000</item>
+        <item>4000</item>
+        <item>7000</item>
+        <item>10000</item>
+        <item>15000</item>
+        <item>20000</item>
+        <item>30000</item>
+        <item>40000</item>
+    </integer-array>
+
+    <!-- Array of desired screen brightness in nits corresponding to the lux values
+         in the config_autoBrightnessLevels array. The display brightness is defined as the measured
+         brightness of an all-white image.
+
+         If this is defined then:
+            - config_autoBrightnessLcdBacklightValues should not be defined
+            - config_screenBrightnessNits must be defined
+            - config_screenBrightnessBacklight must be defined
+
+         This array should have size one greater than the size of the config_autoBrightnessLevels
+         array. The brightness values must be non-negative and non-decreasing. This must be
+         overridden in platform specific overlays -->
+    <!-- Stock OOS nits for the lux levels above (lux_table id 31). Tops out at
+         800 nits full-white = the panel's backlight ceiling; the stock >800-nit
+         sunlight boost uses the oplus HBM interface which the backlight path
+         cannot reach (see displayconfig.xml). -->
+    <array name="config_autoBrightnessDisplayValuesNits">
+        <item>2.5</item>  <!--  0 - 2 -->
+        <item>7.5</item>  <!--  2 - 4 -->
+        <item>13</item>   <!--  4 - 6 -->
+        <item>18</item>   <!--  6 - 8 -->
+        <item>25</item>   <!--  8 - 10 -->
+        <item>30</item>   <!--  10 - 15 -->
+        <item>38</item>   <!--  15 - 20 -->
+        <item>45</item>   <!--  20 - 25 -->
+        <item>50</item>   <!--  25 - 30 -->
+        <item>55</item>   <!--  30 - 40 -->
+        <item>60</item>   <!--  40 - 60 -->
+        <item>70</item>   <!--  60 - 95 -->
+        <item>79</item>   <!--  95 - 100 -->
+        <item>82</item>   <!--  100 - 200 -->
+        <item>90</item>   <!--  200 - 300 -->
+        <item>98</item>   <!--  300 - 400 -->
+        <item>106</item>  <!--  400 - 500 -->
+        <item>113</item>  <!--  500 - 1000 -->
+        <item>152</item>  <!--  1000 - 1100 -->
+        <item>160</item>  <!--  1100 - 1200 -->
+        <item>168</item>  <!--  1200 - 1300 -->
+        <item>177</item>  <!--  1300 - 1400 -->
+        <item>185</item>  <!--  1400 - 1500 -->
+        <item>194</item>  <!--  1500 - 1600 -->
+        <item>203</item>  <!--  1600 - 1700 -->
+        <item>212</item>  <!--  1700 - 1800 -->
+        <item>222</item>  <!--  1800 - 1900 -->
+        <item>232</item>  <!--  1900 - 2000 -->
+        <item>243</item>  <!--  2000 - 4000 -->
+        <item>391</item>  <!--  4000 - 7000 -->
+        <item>500</item>  <!--  7000 - 10000 -->
+        <item>545</item>  <!--  10000 - 15000 -->
+        <item>600</item>  <!--  15000 - 20000 -->
+        <item>650</item>  <!--  20000 - 30000 -->
+        <item>720</item>  <!--  30000 - 40000 -->
+        <item>800</item>  <!--  40000+ -->
+    </array>
+
+    <!-- Array of ambient lux threshold values. This is used for determining hysteresis constraint
+         values by calculating the index to use for lookup and then setting the constraint value
+         to the corresponding value of the array. The new brightening hysteresis constraint value
+         is the n-th element of config_ambientBrighteningThresholds, and the new darkening
+         hysteresis constraint value is the n-th element of config_ambientDarkeningThresholds.
+
+         The (zero-based) index is calculated as follows: (MAX is the largest index of the array)
+         condition                       calculated index
+         value < level[0]                0
+         level[n] <= value < level[n+1]  n+1
+         level[MAX] <= value             MAX+1 -->
+    <integer-array name="config_ambientThresholdLevels">
+        <item>2</item>
+        <item>4</item>
+        <item>6</item>
+        <item>8</item>
+        <item>10</item>
+        <item>15</item>
+        <item>20</item>
+        <item>30</item>
+        <item>40</item>
+        <item>60</item>
+        <item>100</item>
+        <item>200</item>
+        <item>400</item>
+        <item>700</item>
+        <item>1000</item>
+        <item>2000</item>
+        <item>4000</item>
+    </integer-array>
+
+    <!-- Array of hysteresis constraint values for brightening, represented as tenths of a
+         percent. The length of this array is assumed to be one greater than
+         config_ambientThresholdLevels. The brightening threshold is calculated as
+         lux * (1.0f + CONSTRAINT_VALUE). When the current lux is higher than this threshold,
+         the screen brightness is recalculated. See the config_ambientThresholdLevels
+         description for how the constraint value is chosen. -->
+    <!-- Fusion Next Gen is the light source now (content-immune). Drop the
+         interim ~2x glow-mask hysteresis that made ABC ignore normal ambient
+         changes after the first sample. Restore the stock-like curve: modest
+         deadband in near-dark, ~10-15% above ~60 lux.
+         The near-dark end was still carrying the glow-era deadband (2000 =
+         +200%, i.e. lux had to treble before ABC would lift off the minimum),
+         which read as "stuck at min". Fusion already subtracts the panel's own
+         glow, so that margin only has to cover sensor noise now: halve it to
+         +100% at the bottom and taper smoothly into the existing +10% tail. -->
+    <integer-array name="config_ambientBrighteningThresholds">
+        <item>1000</item>
+        <item>800</item>
+        <item>700</item>
+        <item>600</item>
+        <item>500</item>
+        <item>400</item>
+        <item>300</item>
+        <item>250</item>
+        <item>200</item>
+        <item>180</item>
+        <item>150</item>
+        <item>120</item>
+        <item>100</item>
+        <item>100</item>
+        <item>100</item>
+        <item>100</item>
+        <item>100</item>
+        <item>100</item>
+    </integer-array>
+
+    <!-- Array of hysteresis constraint values for darkening, represented as tenths of a
+         percent. The length of this array is assumed to be one greater than
+         config_ambientThresholdLevels. The darkening threshold is calculated as
+         lux * (1.0f - CONSTRAINT_VALUE). When the current lux is lower than this threshold,
+         the screen brightness is recalculated. See the config_ambientThresholdLevels
+         description for how the constraint value is chosen. -->
+    <integer-array name="config_ambientDarkeningThresholds">
+        <item>600</item>
+        <item>600</item>
+        <item>550</item>
+        <item>550</item>
+        <item>500</item>
+        <item>500</item>
+        <item>450</item>
+        <item>450</item>
+        <item>400</item>
+        <item>400</item>
+        <item>380</item>
+        <item>360</item>
+        <item>340</item>
+        <item>320</item>
+        <item>300</item>
+        <item>300</item>
+        <item>280</item>
+        <item>250</item>
+    </integer-array>
+
+    <!-- Array of hysteresis constraint values for brightening, represented as tenths of a
+         percent. The length of this array is assumed to be one greater than
+         config_screenThresholdLevels. The brightening threshold is calculated as
+         screenBrightness * (1.0f + CONSTRAINT_VALUE). When the new screen brightness is higher
+         than this threshold, it is applied. See the config_screenThresholdLevels description for
+         how the constraint value is chosen. -->
+    <integer-array name="config_screenBrighteningThresholds">
+        <item>0</item>
+    </integer-array>
+
+    <!-- Array of hysteresis constraint values for darkening, represented as tenths of a
+         percent. The length of this array is assumed to be one greater than
+         config_screenThresholdLevels. The darkening threshold is calculated as
+         screenBrightness * (1.0f - CONSTRAINT_VALUE). When the new screen brightness is lower than
+         this threshold, it is applied. See the config_screenThresholdLevels description for how
+         the constraint value is chosen. -->
+    <integer-array name="config_screenDarkeningThresholds">
+        <item>0</item>
+    </integer-array>
 
     <!-- The bounding path of the cutout region of the main built-in display.
          Must either be empty if there is no cutout region, or a string that is parsable by
@@ -97,7 +373,7 @@
          black in software (to avoid aliasing or emulate a cutout that is not physically existent).
          -->
     <bool name="config_fillMainBuiltInDisplayCutout">true</bool>
- 
+
     <!-- Type of the udfps long press sensor. Empty if long press is not supported. -->
     <string name="config_dozeUdfpsLongPressSensorType" translatable="false">org.lineageos.sensor.udfps</string>
 
