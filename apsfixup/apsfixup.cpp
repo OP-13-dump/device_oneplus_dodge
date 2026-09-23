@@ -10,6 +10,7 @@
 //   (2) p010LSB2MSBNeon: set w5 so w4*w5*1.5 == buffer (full Y+UV).
 //
 // GOT redirection only -- no code patching, no execmem/execmod.
+// All buffer rewrites are skipped on APS's Java HEIF route (see fix_on()).
 //
 // Durable across firmware bumps:
 //   * JUMP_SLOT offsets are discovered by walking the in-memory ELF (dynsym +
@@ -170,6 +171,27 @@ static void dump_struct_once(uint8_t* b, uint64_t lim) {
     }
 }
 
+// The buffer rewrites were tuned on APS's dlsym HEIF/buffer route and misfire on
+// stock's Java route (g_HeifWinBufReflectJavaFlag set), so they only run on the
+// dlsym route. debug.apsfixup.<name>=1/0 forces one on or off.
+static bool fix_on(const char* name) {
+    char key[PROP_NAME_MAX], v[PROP_VALUE_MAX] = "";
+    snprintf(key, sizeof(key), "debug.apsfixup.%s", name);
+    if (__system_property_get(key, v) > 0) return v[0] == '1';
+    static const uint8_t* java_flag = nullptr;
+    if (!java_flag) {
+        void* h = dlopen("libAlgoProcess.so", RTLD_NOLOAD);
+        if (h) java_flag = (const uint8_t*)dlsym(h, "g_HeifWinBufReflectJavaFlag");
+    }
+    int java = java_flag && *java_flag;
+    static int logged = -1;
+    if (logged != java) {
+        logged = java;
+        LOGI("APS route: %s, buffer rewrites %s", java ? "java" : "dlsym", java ? "off" : "on");
+    }
+    return !java;
+}
+
 // Portrait dual-cam stills put main Y and aux Y next to each other, both
 // live 4MB+ mappings. Treating the aux pointer as UV (the photo-mode
 // green-frame heuristic) smashes disparity and the JPEG comes out blue
@@ -248,6 +270,7 @@ static void repair_struct(void* p) {
 
 extern "C" __attribute__((visibility("hidden"))) void aps_repair_structs(void* a1, void* a2,
                                                                         void* a3, void* a4) {
+    if (!fix_on("chroma")) return;
     repair_struct(a1);
     repair_struct(a2);
     repair_struct(a3);
@@ -483,7 +506,7 @@ typedef void (*p010_t)(uint16_t*, uint16_t*, uint32_t, uint32_t, uint32_t, uint3
 static p010_t g_real_p010 = nullptr;
 static void wrap_p010(uint16_t* dst, uint16_t* src, uint32_t w2, uint32_t w3, uint32_t w4,
                       uint32_t w5) {
-    if (w4 > 0) {
+    if (w4 > 0 && fix_on("p010")) {
         uint64_t sb, ss;
         if (range_of((uint64_t)src, &sb, &ss)) {
             uint64_t avail = (sb + ss) - (uint64_t)src;
@@ -1372,7 +1395,7 @@ static bool g_proc_req_hooked = false;
 
 static int wrap_proc_req(void* self, bool flag, void** bufs, void* a3, int w, int h) {
     int rc = g_real_proc_req(self, flag, bufs, a3, w, h);
-    if (qj_skip_portrait()) return rc;
+    if (qj_skip_portrait() || !fix_on("qj")) return rc;
     qj_note_quick_h(w, h);
     if (qj_is_quick_wh(w, h)) {
         int n = qj_swap_obj(bufs, 16) + qj_swap_obj(a3, 16);
@@ -1393,7 +1416,7 @@ static hwjpeg_t g_real_hwjpeg = nullptr;
 static bool g_hwjpeg_hooked = false;
 
 static int wrap_hwjpeg(void* data, void* buf, int a, unsigned char b, int c, int d) {
-    if (qj_skip_portrait()) return g_real_hwjpeg(data, buf, a, b, c, d);
+    if (qj_skip_portrait() || !fix_on("qj")) return g_real_hwjpeg(data, buf, a, b, c, d);
     int n = qj_swap_obj_first(buf, 512);
     if (!n) n = qj_swap_obj_first(data, 512);
     if (!n) n = qj_swap_yuv_sized();
@@ -1413,7 +1436,7 @@ static bool g_dumpqj_hooked = false;
 
 static int wrap_dumpqj(void* self, void* data, int n) {
     int rc = g_real_dumpqj(self, data, n);
-    if (qj_skip_portrait()) return rc;
+    if (qj_skip_portrait() || !fix_on("qj")) return rc;
     // File only. The first on-screen frame may already have been painted
     // from YUV; this keeps the cache and any late decode in sync.
     // Use nftw-less: try the newest names via a dir fd + getdents is messy
@@ -1450,7 +1473,8 @@ static bool swenc_is_video_wh(int w, int h) {
 static long wrap_swenc(void* img, unsigned char* out, int cap, unsigned long* len, void* exif,
                        int cs, int jcs) {
     auto* in = static_cast<ApsJpegInImageHead*>(img);
-    if (!in || in->format != 0x23 || !swenc_is_video_wh(in->width, in->height))
+    if (!in || in->format != 0x23 || !swenc_is_video_wh(in->width, in->height) ||
+        !fix_on("swenc"))
         return g_real_swenc(img, out, cap, len, exif, cs, jcs);
     in->format = 0x11;
     long rc = g_real_swenc(img, out, cap, len, exif, cs, jcs);
