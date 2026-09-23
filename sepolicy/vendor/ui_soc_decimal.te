@@ -1,0 +1,6 @@
+# /proc/ui_soc_decimal (oplus_chg_comm): live decimal SoC for the SuperVOOC ring.
+type oplus_ui_soc_decimal_proc, fs_type, proc_type;
+
+# vendor.oplus.hardware.charger-V10-service.rc: write /proc/ui_soc_decimal 1
+allow init oplus_ui_soc_decimal_proc:file w_file_perms;
+allow platform_app oplus_ui_soc_decimal_proc:file r_file_perms;
