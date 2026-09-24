@@ -266,8 +266,8 @@ static void dump_struct_once(uint8_t* b, uint64_t lim) {
 
 // The buffer rewrites were tuned on APS's dlsym HEIF/buffer route and misfire on
 // stock's Java route (g_HeifWinBufReflectJavaFlag set), so they only run on the
-// dlsym route. The Quick JPEG un-swap is the exception: on the Java route the
-// quick preview comes out Cb/Cr swapped, so it stays on for both.
+// dlsym route. The Quick JPEG un-swap and the HEIF result label are the
+// exceptions: both are needed on the Java route too.
 // debug.apsfixup.<name>=1/0 forces one on or off.
 static bool fix_on(const char* name) {
     char key[PROP_NAME_MAX], v[PROP_VALUE_MAX] = "";
@@ -285,7 +285,7 @@ static bool fix_on(const char* name) {
         LOGI("APS route: %s, buffer rewrites %s", java ? "java" : "dlsym",
              java ? "off except qj" : "on");
     }
-    if (!strcmp(name, "qj")) return true;
+    if (!strcmp(name, "qj") || !strcmp(name, "heiftype")) return true;
     return !java;
 }
 
@@ -1750,6 +1750,62 @@ static bool hook_mapfind() {
     return true;
 }
 
+// APS labels a result with its buffer's format, reading YUV formats from the
+// gralloc handle at +0x2c. Our CAF snapalloc keeps a width there, so the
+// HEIF-done result is labelled 0x23 instead of NV21 and the camera SDK drops
+// it (onCaptureReceived only routes 17/54/0x7fa30c0a to HEIC): no rename into
+// DCIM, defer job never cleared. Relabel that one result.
+struct ApsKV {
+    std::string key;
+    std::string value;
+};
+typedef int (*setres_t)(void*, int, std::vector<ApsKV>*, void*);
+static setres_t g_real_setres = nullptr;
+static bool g_setres_done = false;
+static bool g_setres_found = false;
+static uint64_t g_setres_got = 0;
+static uint64_t g_setres_func = 0;
+
+static int wrap_setres(void* cb, int type, std::vector<ApsKV>* kv, void* extra) {
+    int rc = g_real_setres(cb, type, kv, extra);
+    if (!kv || !fix_on("heiftype")) return rc;
+    ApsKV* bt = nullptr;
+    bool heif = false, done = false;
+    for (auto& e : *kv) {
+        if (e.key == "resultinfo_buffer_type") bt = &e;
+        else if (e.key == "resultinfo_heif_encode_in_aps") heif = e.value == "true";
+        else if (e.key == "resultinfo_message_type") done = e.value == "3";
+    }
+    if (heif && done && bt && bt->value == "35") {
+        bt->value = "17";
+        LOGI("heif result buffer_type 35 -> 17");
+    }
+    return rc;
+}
+
+static bool hook_setres() {
+    if (g_setres_done) return true;
+    uint64_t base;
+    if (!module_base("libAlgoProcess.so", &base)) return false;
+    if (!g_setres_found) {
+        if (!elf_find_jmpslot(base, 0x800000, "camApsSetResultInfo", false, &g_setres_got,
+                              &g_setres_func))
+            return false;
+        g_setres_found = true;
+        LOGI("ELF camApsSetResultInfo GOT=+0x%llx func=+0x%llx", (unsigned long long)g_setres_got,
+             (unsigned long long)g_setres_func);
+    }
+    uint64_t slot = base + g_setres_got;
+    void* cur = nullptr;
+    if (!got_slot_mapped(slot, &cur) || cur != (void*)(base + g_setres_func)) return false;
+    g_real_setres = (setres_t)cur;
+    void* old = nullptr;
+    if (!got_redirect(slot, (void*)wrap_setres, &old)) return false;
+    g_setres_done = true;
+    LOGI("GOT-hooked camApsSetResultInfo (real=%p)", old);
+    return true;
+}
+
 static bool hook_proc_req() {
     return hook_one(
         "_ZN6vendor3qti8hardware6camera13offlinecamera14implementation19OfflineCameraClient21"
@@ -1815,6 +1871,7 @@ static void try_install() {
     hook_dumpqj();
     hook_swenc();
     hook_mapfind();
+    hook_setres();
     patch_cached_tfrsn();
     qj_guard_refresh();
 }
@@ -1825,7 +1882,7 @@ static void* poller(void*) {
         uint64_t fusion = 0;
         bool have_fusion = module_base("libarcsoft_turbo_fusion_raw_super_night.so", &fusion);
         if (g_p010_done && g_dlsym_iface_done && g_dlsym_proc_done && g_proc_req_hooked &&
-            g_hwjpeg_hooked && (g_mapfind_done || i > 2400) &&
+            g_hwjpeg_hooked && (g_mapfind_done || i > 2400) && (g_setres_done || i > 2400) &&
             (g_tfrsn_patched || g_tfrsn_gaveup || (!have_fusion && i > 200)))
             break;
         usleep(25 * 1000);
