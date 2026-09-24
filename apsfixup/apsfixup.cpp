@@ -198,12 +198,15 @@ static bool fix_on(const char* name) {
 // added _BASIC_, so every HEIF param misses: 0x0 geometry, no fd, JPEG bytes in
 // the .heic. Rename the writer's keys to what cmd-jni reads. Matched on the
 // value suffix, so a wrong symbol/key pairing can't rename anything else.
+//
+// The 3A debug pair stays unrenamed on purpose. cmd-jni hands heifProcess the
+// map string's own buffer and heifProcess free()s it: scudo aborts the camera
+// after the .heic is written. Missing keys give NULL/0, which it skips.
 static const char* const kHeifKeySyms[] = {
     "g_KeyAttachBufQ_consumerPtr",  "g_KeyAttachBufQ_imageBuffer",
     "g_KeyExif_bufPlanesColStride", "g_KeyExif_bufPlanesData",
     "g_KeyExif_bufPlanesHeight",    "g_KeyExif_bufPlanesRowStride",
-    "g_KeyExif_bufPlanesWidth",     "g_KeyExif_cbImgHeifDebugData",
-    "g_KeyExif_cbImgHeifDebugSize", "g_KeyExif_cbImgHeifExifBuf",
+    "g_KeyExif_bufPlanesWidth",     "g_KeyExif_cbImgHeifExifBuf",
     "g_KeyExif_cbImgHeifExifSize",  "g_KeyExif_cbImgHeifFd",
     "g_KeyExif_cbImgRotation",      "g_KeyExif_heifEncodeFmt",
 };
