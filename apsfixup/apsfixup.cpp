@@ -175,7 +175,9 @@ static void dump_struct_once(uint8_t* b, uint64_t lim) {
 
 // The buffer rewrites were tuned on APS's dlsym HEIF/buffer route and misfire on
 // stock's Java route (g_HeifWinBufReflectJavaFlag set), so they only run on the
-// dlsym route. debug.apsfixup.<name>=1/0 forces one on or off.
+// dlsym route. The Quick JPEG un-swap is the exception: on the Java route the
+// quick preview comes out Cb/Cr swapped, so it stays on for both.
+// debug.apsfixup.<name>=1/0 forces one on or off.
 static bool fix_on(const char* name) {
     char key[PROP_NAME_MAX], v[PROP_VALUE_MAX] = "";
     snprintf(key, sizeof(key), "debug.apsfixup.%s", name);
@@ -189,8 +191,10 @@ static bool fix_on(const char* name) {
     static int logged = -1;
     if (logged != java) {
         logged = java;
-        LOGI("APS route: %s, buffer rewrites %s", java ? "java" : "dlsym", java ? "off" : "on");
+        LOGI("APS route: %s, buffer rewrites %s", java ? "java" : "dlsym",
+             java ? "off except qj" : "on");
     }
+    if (!strcmp(name, "qj")) return true;
     return !java;
 }
 
@@ -1399,6 +1403,39 @@ static void qj_census_once() {
          memfd, other);
 }
 
+// When the walk misses, list the image-sized mappings one word away from an
+// encode argument ('*' = quick-sized, 'ro' = not writable). Capped: each word
+// costs a /proc/self/maps parse.
+static int g_qj_diag_left = 8;
+
+static void qj_diag(const char* tag, void* obj) {
+    if (g_qj_diag_left <= 0) return;
+    g_qj_diag_left--;
+    obj = qj_untag(obj);
+    uint64_t b = 0, s = 0;
+    if (!obj || !range_of((uint64_t)obj, &b, &s)) {
+        LOGW("qj-diag %s %p: unmapped", tag, obj);
+        return;
+    }
+    char out[768];
+    int o = snprintf(out, sizeof(out), "qj-diag %s %p map=%llu:", tag, obj,
+                     (unsigned long long)s);
+    size_t max = (size_t)(s - ((uint64_t)obj - b)) / sizeof(void*);
+    if (max > 64) max = 64;
+    auto** w = reinterpret_cast<void**>(obj);
+    for (size_t i = 0; i < max && o < (int)sizeof(out) - 48; i++) {
+        void* v = nullptr;
+        QJ_GUARDED(b, b + s, { v = w[i]; });
+        v = qj_untag(v);
+        uint64_t vb = 0, vs = 0;
+        char perms[5] = {0};
+        if (!v || !range_of_perms((uint64_t)v, &vb, &vs, perms) || vs < (512u << 10)) continue;
+        o += snprintf(out + o, sizeof(out) - o, " [%zu]%llu%s%s", i, (unsigned long long)vs,
+                      perms[1] == 'w' ? "" : "ro", qj_looks_quick_yuv((size_t)vs) ? "*" : "");
+    }
+    LOGW("%s", out);
+}
+
 // Exact-size 1280x960 YUV only. Those sizes are linear NV12, including dmabuf.
 // Acts only when exactly one mapping matches. With more than one there is no
 // way to tell the Quick JPEG from a buffer that is on screen, and swapping
@@ -1454,7 +1491,11 @@ static int wrap_proc_req(void* self, bool flag, void** bufs, void* a3, int w, in
         if (!n) n = qj_swap_obj_first(bufs, 512);
         if (!n) n = qj_swap_obj_first(a3, 512);
         if (!n) n = qj_swap_yuv_sized();
-        if (!n) qj_census_once();
+        if (!n) {
+            qj_census_once();
+            qj_diag("procreq.bufs", bufs);
+            qj_diag("procreq.a3", a3);
+        }
         LOGI(n ? "qj-uv after processOfflineRequest swapped %d"
                : "qj-uv after processOfflineRequest found no buffer",
              n);
@@ -1472,8 +1513,14 @@ static int wrap_hwjpeg(void* data, void* buf, int a, unsigned char b, int c, int
     int n = qj_swap_obj_first(buf, 512);
     if (!n) n = qj_swap_obj_first(data, 512);
     if (!n) n = qj_swap_yuv_sized();
-    if (n) LOGI("qj-uv before hwJpegEncodec swapped %d (d=%d)", n, d);
-    else qj_census_once();
+    if (n) {
+        LOGI("qj-uv before hwJpegEncodec swapped %d (d=%d)", n, d);
+    } else {
+        qj_census_once();
+        if (g_qj_diag_left > 0) LOGW("qj-diag hwjpeg a=%d b=%u c=%d d=%d", a, b, c, d);
+        qj_diag("hwjpeg.buf", buf);
+        qj_diag("hwjpeg.data", data);
+    }
     int rc = g_real_hwjpeg(data, buf, a, b, c, d);
     // Encode output may be the 960x1280 JPEG. Swap that one pointer only.
     int m = qj_swap_at(buf) + qj_swap_at(data);
