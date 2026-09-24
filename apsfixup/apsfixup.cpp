@@ -48,6 +48,8 @@
 #include <time.h>
 #include <unistd.h>
 
+#include <string>
+
 #define TAG "apsfixup"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, TAG, __VA_ARGS__)
 #define LOGW(...) __android_log_print(ANDROID_LOG_WARN, TAG, __VA_ARGS__)
@@ -190,6 +192,69 @@ static bool fix_on(const char* name) {
         LOGI("APS route: %s, buffer rewrites %s", java ? "java" : "dlsym", java ? "off" : "on");
     }
     return !java;
+}
+
+// cmd-jni's dlsym-route readers use the key names from before libAlgoProcess
+// added _BASIC_, so every HEIF param misses: 0x0 geometry, no fd, JPEG bytes in
+// the .heic. Rename the writer's keys to what cmd-jni reads. Matched on the
+// value suffix, so a wrong symbol/key pairing can't rename anything else.
+static const char* const kHeifKeySyms[] = {
+    "g_KeyAttachBufQ_consumerPtr",  "g_KeyAttachBufQ_imageBuffer",
+    "g_KeyExif_bufPlanesColStride", "g_KeyExif_bufPlanesData",
+    "g_KeyExif_bufPlanesHeight",    "g_KeyExif_bufPlanesRowStride",
+    "g_KeyExif_bufPlanesWidth",     "g_KeyExif_cbImgHeifDebugData",
+    "g_KeyExif_cbImgHeifDebugSize", "g_KeyExif_cbImgHeifExifBuf",
+    "g_KeyExif_cbImgHeifExifSize",  "g_KeyExif_cbImgHeifFd",
+    "g_KeyExif_cbImgRotation",      "g_KeyExif_heifEncodeFmt",
+};
+static const int kHeifKeyN = sizeof(kHeifKeySyms) / sizeof(kHeifKeySyms[0]);
+
+static const char* const kHeifKeySuffix[][2] = {
+    {"_INT_BASIC_", "_INT_"},
+    {"_LONG_BASIC_", "_LONG_"},
+    {"_STRING_BASIC_", "_STRING_"},
+    {"_BYTE_BASIC_ARRAY_", "_BYTEARRAY_"},
+};
+
+static bool g_heif_keys_done = false;
+static int g_heif_keys_tries = 0;
+static pthread_mutex_t g_heif_keys_mu = PTHREAD_MUTEX_INITIALIZER;
+
+// Called from wrap_dlsym: libAlgoProcess only dlsyms after its static init has
+// built these globals, so they are never read half-constructed.
+static void heif_keys_rename() {
+    if (g_heif_keys_done) return;
+    pthread_mutex_lock(&g_heif_keys_mu);
+    if (!g_heif_keys_done && fix_on("heifkeys")) {
+        static void* h = nullptr;
+        if (!h) h = dlopen("libAlgoProcess.so", RTLD_NOLOAD);
+        std::string* keys[kHeifKeyN] = {};
+        int ready = 0;
+        for (int i = 0; h && i < kHeifKeyN; i++) {
+            keys[i] = (std::string*)dlsym(h, kHeifKeySyms[i]);
+            if (keys[i] && !keys[i]->empty()) ready++;
+        }
+        if (ready == kHeifKeyN) {
+            int n = 0;
+            for (std::string* k : keys) {
+                for (const auto& s : kHeifKeySuffix) {
+                    size_t fl = strlen(s[0]);
+                    if (k->size() > fl && k->compare(k->size() - fl, fl, s[0]) == 0) {
+                        k->replace(k->size() - fl, fl, s[1]);
+                        n++;
+                        break;
+                    }
+                }
+            }
+            g_heif_keys_done = true;
+            LOGI("heif keys renamed for cmd-jni: %d/%d", n, kHeifKeyN);
+        } else if (++g_heif_keys_tries >= 200) {
+            g_heif_keys_done = true;
+            LOGW("heif keys not built after %d tries (%d/%d), giving up", g_heif_keys_tries,
+                 ready, kHeifKeyN);
+        }
+    }
+    pthread_mutex_unlock(&g_heif_keys_mu);
 }
 
 // Portrait dual-cam stills put main Y and aux Y next to each other, both
@@ -433,6 +498,7 @@ static dlsym_t g_real_dlsym = nullptr;
 static void patch_cached_tfrsn();
 
 static void* wrap_dlsym(void* handle, const char* symbol) {
+    heif_keys_rename();
     void* res = g_real_dlsym(handle, symbol);
 
     if (res && symbol && !strcmp(symbol, "ARC_DCIR_Process")) {
