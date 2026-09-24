@@ -49,6 +49,7 @@
 #include <unistd.h>
 
 #include <string>
+#include <vector>
 
 #define TAG "apsfixup"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, TAG, __VA_ARGS__)
@@ -60,8 +61,98 @@
 
 static const uint64_t MIN_SNAPSHOT = 0x400000;
 
+// One /proc/self/maps read costs ~9 ms in the camera (~6k mappings) and holds
+// mmap_lock. The Quick JPEG walks look up ~1000 pointers per encode, which
+// stalled APS's quick thread 5-14 s per shot. Hooks read maps once instead.
+struct MapRange {
+    uint64_t lo, hi;
+    char perms[5];
+};
+
+static __thread std::vector<MapRange>* g_maps_snap = nullptr;
+
+static uint64_t hexval(char c) {
+    return c <= '9' ? c - '0' : (c & 0xDF) - 'A' + 10;
+}
+
+static bool maps_snap_read(std::vector<MapRange>* out) {
+    int fd = open("/proc/self/maps", O_RDONLY | O_CLOEXEC);
+    if (fd < 0) return false;
+    char buf[8192];
+    ssize_t bytes;
+    MapRange r{};
+    int state = 0, pn = 0;
+    while ((bytes = read(fd, buf, sizeof(buf))) > 0) {
+        for (ssize_t i = 0; i < bytes; i++) {
+            char c = buf[i];
+            if (state == 0) {
+                if (c == '-') state = 1;
+                else r.lo = (r.lo << 4) | hexval(c);
+            } else if (state == 1) {
+                if (c == ' ') {
+                    state = 2;
+                    pn = 0;
+                } else {
+                    r.hi = (r.hi << 4) | hexval(c);
+                }
+            } else if (state == 2) {
+                r.perms[pn++] = c;
+                if (pn == 4) {
+                    out->push_back(r);
+                    state = 3;
+                }
+            } else if (c == '\n') {
+                state = 0;
+                r = MapRange{};
+            }
+        }
+    }
+    close(fd);
+    return !out->empty();
+}
+
+// Maps are sorted and disjoint: first range ending past addr.
+static bool maps_snap_find(const std::vector<MapRange>& v, uint64_t addr, uint64_t* out_base,
+                           uint64_t* out_size, char* out_perms) {
+    size_t lo = 0, hi = v.size();
+    while (lo < hi) {
+        size_t mid = lo + (hi - lo) / 2;
+        if (v[mid].hi <= addr) lo = mid + 1;
+        else hi = mid;
+    }
+    if (lo == v.size() || addr < v[lo].lo) return false;
+    *out_base = v[lo].lo;
+    *out_size = v[lo].hi - v[lo].lo;
+    if (out_perms) memcpy(out_perms, v[lo].perms, 5);
+    return true;
+}
+
+// range_of*() answers from this thread's snapshot while one is in scope.
+// Staleness is covered by QJ_GUARDED, as with a per-lookup read.
+class MapsSnapScope {
+  public:
+    MapsSnapScope() {
+        if (g_maps_snap) return;
+        snap_.reserve(8192);
+        if (maps_snap_read(&snap_)) {
+            g_maps_snap = &snap_;
+            owner_ = true;
+        }
+    }
+    ~MapsSnapScope() {
+        if (owner_) g_maps_snap = nullptr;
+    }
+    MapsSnapScope(const MapsSnapScope&) = delete;
+    MapsSnapScope& operator=(const MapsSnapScope&) = delete;
+
+  private:
+    std::vector<MapRange> snap_;
+    bool owner_ = false;
+};
+
 static bool range_of_perms(uint64_t addr, uint64_t* out_base, uint64_t* out_size,
                            char* out_perms) {
+    if (g_maps_snap) return maps_snap_find(*g_maps_snap, addr, out_base, out_size, out_perms);
     int fd = open("/proc/self/maps", O_RDONLY | O_CLOEXEC);
     if (fd < 0) return false;
 
@@ -1487,6 +1578,7 @@ static int wrap_proc_req(void* self, bool flag, void** bufs, void* a3, int w, in
     if (qj_skip_portrait() || !fix_on("qj")) return rc;
     qj_note_quick_h(w, h);
     if (qj_is_quick_wh(w, h)) {
+        MapsSnapScope snap;
         int n = qj_swap_obj(bufs, 16) + qj_swap_obj(a3, 16);
         if (!n) n = qj_swap_obj_first(bufs, 512);
         if (!n) n = qj_swap_obj_first(a3, 512);
@@ -1510,19 +1602,24 @@ static bool g_hwjpeg_hooked = false;
 
 static int wrap_hwjpeg(void* data, void* buf, int a, unsigned char b, int c, int d) {
     if (qj_skip_portrait() || !fix_on("qj")) return g_real_hwjpeg(data, buf, a, b, c, d);
-    int n = qj_swap_obj_first(buf, 512);
-    if (!n) n = qj_swap_obj_first(data, 512);
-    if (!n) n = qj_swap_yuv_sized();
-    if (n) {
-        LOGI("qj-uv before hwJpegEncodec swapped %d (d=%d)", n, d);
-    } else {
-        qj_census_once();
-        if (g_qj_diag_left > 0) LOGW("qj-diag hwjpeg a=%d b=%u c=%d d=%d", a, b, c, d);
-        qj_diag("hwjpeg.buf", buf);
-        qj_diag("hwjpeg.data", data);
+    {
+        MapsSnapScope snap;
+        int n = qj_swap_obj_first(buf, 512);
+        if (!n) n = qj_swap_obj_first(data, 512);
+        if (!n) n = qj_swap_yuv_sized();
+        if (n) {
+            LOGI("qj-uv before hwJpegEncodec swapped %d (d=%d)", n, d);
+        } else {
+            qj_census_once();
+            if (g_qj_diag_left > 0) LOGW("qj-diag hwjpeg a=%d b=%u c=%d d=%d", a, b, c, d);
+            qj_diag("hwjpeg.buf", buf);
+            qj_diag("hwjpeg.data", data);
+        }
     }
     int rc = g_real_hwjpeg(data, buf, a, b, c, d);
     // Encode output may be the 960x1280 JPEG. Swap that one pointer only.
+    // Fresh snapshot: the encode can map its output.
+    MapsSnapScope snap;
     int m = qj_swap_at(buf) + qj_swap_at(data);
     if (!m) m = qj_wide_at(buf) + qj_wide_at(data);
     if (m) LOGI("qj-uv after hwJpegEncodec swapped %d jpeg/yuv", m);
@@ -1541,7 +1638,10 @@ static int wrap_dumpqj(void* self, void* data, int n) {
     // Use nftw-less: try the newest names via a dir fd + getdents is messy
     // without dirent.h — open common path if we can find it via maps? Skip
     // the dir walk; qj_swap_at on `data` covers the in-memory JPEG.
-    qj_swap_obj(data, 16);
+    {
+        MapsSnapScope snap;
+        qj_swap_obj(data, 16);
+    }
     // 16:9 only. Every other ratio paints its review correctly already, and
     // swapping a correct buffer is what tinted them. The quick file is on disk
     // by the time this returns, so swapping here cannot invert it.
