@@ -194,70 +194,54 @@ static bool fix_on(const char* name) {
     return !java;
 }
 
-// cmd-jni's dlsym-route readers use the key names from before libAlgoProcess
-// added _BASIC_, so every HEIF param misses: 0x0 geometry, no fd, JPEG bytes in
-// the .heic. Rename the writer's keys to what cmd-jni reads. Matched on the
-// value suffix, so a wrong symbol/key pairing can't rename anything else.
+// cmd-jni's dlsym-route readers look HEIF params up by the names from before
+// libAlgoProcess added _BASIC_, so every lookup misses: 0x0 geometry, no fd,
+// JPEG bytes in the .heic. Retry those misses under the new name rather than
+// renaming the map: convertNMap2JMap turns the same map back into Java by key
+// name, and an old-style _BYTEARRAY_ key makes it DeleteLocalRef the raw plane
+// pointer, which ART aborts on.
 //
-// The 3A debug pair stays unrenamed on purpose. cmd-jni hands heifProcess the
-// map string's own buffer and heifProcess free()s it: scudo aborts the camera
-// after the .heic is written. Missing keys give NULL/0, which it skips.
-static const char* const kHeifKeySyms[] = {
-    "g_KeyAttachBufQ_consumerPtr",  "g_KeyAttachBufQ_imageBuffer",
-    "g_KeyExif_bufPlanesColStride", "g_KeyExif_bufPlanesData",
-    "g_KeyExif_bufPlanesHeight",    "g_KeyExif_bufPlanesRowStride",
-    "g_KeyExif_bufPlanesWidth",     "g_KeyExif_cbImgHeifExifBuf",
-    "g_KeyExif_cbImgHeifExifSize",  "g_KeyExif_cbImgHeifFd",
-    "g_KeyExif_cbImgRotation",      "g_KeyExif_heifEncodeFmt",
+// The 3A debug pair is left out on purpose. cmd-jni hands heifProcess the map
+// string's own buffer and heifProcess free()s it; a miss gives NULL/0, which it
+// skips.
+static const char* const kHeifKeys[][2] = {
+    {"attachBufQParam_consumerPtr_LONG_", "attachBufQParam_consumerPtr_LONG_BASIC_"},
+    {"attachBufQParam_imageBuffer_LONG_", "attachBufQParam_imageBuffer_LONG_BASIC_"},
+    {"exifData_bufferPlanesColstride_INT_", "exifData_bufferPlanesColstride_INT_BASIC_"},
+    {"exifData_bufferPlanesData_BYTEARRAY_", "exifData_bufferPlanesData_BYTE_BASIC_ARRAY_"},
+    {"exifData_bufferPlanesHeight_INT_", "exifData_bufferPlanesHeight_INT_BASIC_"},
+    {"exifData_bufferPlanesRowstride_INT_", "exifData_bufferPlanesRowstride_INT_BASIC_"},
+    {"exifData_bufferPlanesWidth_INT_", "exifData_bufferPlanesWidth_INT_BASIC_"},
+    {"exifData_callBackImgHeifExifBuffer_STRING_",
+     "exifData_callBackImgHeifExifBuffer_STRING_BASIC_"},
+    {"exifData_callBackImgHeifExifSize_INT_", "exifData_callBackImgHeifExifSize_INT_BASIC_"},
+    {"exifData_callBackImgHeifFd_INT_", "exifData_callBackImgHeifFd_INT_BASIC_"},
+    {"exifData_callBackImgRotation_INT_", "exifData_callBackImgRotation_INT_BASIC_"},
+    {"exifData_heifEncodeFormat_INT_", "exifData_heifEncodeFormat_INT_BASIC_"},
 };
-static const int kHeifKeyN = sizeof(kHeifKeySyms) / sizeof(kHeifKeySyms[0]);
 
-static const char* const kHeifKeySuffix[][2] = {
-    {"_INT_BASIC_", "_INT_"},
-    {"_LONG_BASIC_", "_LONG_"},
-    {"_STRING_BASIC_", "_STRING_"},
-    {"_BYTE_BASIC_ARRAY_", "_BYTEARRAY_"},
-};
+// std::map<std::string, std::vector<std::string>>::find in cmd-jni (NDK libc++,
+// same layout as ours). Returns the iterator's node pointer.
+typedef void* (*mapfind_t)(void* tree, const std::string* key);
+static mapfind_t g_real_mapfind = nullptr;
+static int g_mapfind_logged = 0;
 
-static bool g_heif_keys_done = false;
-static int g_heif_keys_tries = 0;
-static pthread_mutex_t g_heif_keys_mu = PTHREAD_MUTEX_INITIALIZER;
-
-// Called from wrap_dlsym: libAlgoProcess only dlsyms after its static init has
-// built these globals, so they are never read half-constructed.
-static void heif_keys_rename() {
-    if (g_heif_keys_done) return;
-    pthread_mutex_lock(&g_heif_keys_mu);
-    if (!g_heif_keys_done && fix_on("heifkeys")) {
-        static void* h = nullptr;
-        if (!h) h = dlopen("libAlgoProcess.so", RTLD_NOLOAD);
-        std::string* keys[kHeifKeyN] = {};
-        int ready = 0;
-        for (int i = 0; h && i < kHeifKeyN; i++) {
-            keys[i] = (std::string*)dlsym(h, kHeifKeySyms[i]);
-            if (keys[i] && !keys[i]->empty()) ready++;
+static void* wrap_mapfind(void* tree, const std::string* key) {
+    void* it = g_real_mapfind(tree, key);
+    // libc++ __tree: the end node sits right after __begin_node_.
+    if (it != (char*)tree + sizeof(void*)) return it;
+    for (const auto& k : kHeifKeys) {
+        if (*key != k[0]) continue;
+        if (!fix_on("heifkeys")) return it;
+        std::string alt(k[1]);
+        void* hit = g_real_mapfind(tree, &alt);
+        if (g_mapfind_logged < 24) {
+            g_mapfind_logged++;
+            LOGI("heif key %s -> %s", k[0], hit != it ? "_BASIC_" : "missing");
         }
-        if (ready == kHeifKeyN) {
-            int n = 0;
-            for (std::string* k : keys) {
-                for (const auto& s : kHeifKeySuffix) {
-                    size_t fl = strlen(s[0]);
-                    if (k->size() > fl && k->compare(k->size() - fl, fl, s[0]) == 0) {
-                        k->replace(k->size() - fl, fl, s[1]);
-                        n++;
-                        break;
-                    }
-                }
-            }
-            g_heif_keys_done = true;
-            LOGI("heif keys renamed for cmd-jni: %d/%d", n, kHeifKeyN);
-        } else if (++g_heif_keys_tries >= 200) {
-            g_heif_keys_done = true;
-            LOGW("heif keys not built after %d tries (%d/%d), giving up", g_heif_keys_tries,
-                 ready, kHeifKeyN);
-        }
+        return hit;
     }
-    pthread_mutex_unlock(&g_heif_keys_mu);
+    return it;
 }
 
 // Portrait dual-cam stills put main Y and aux Y next to each other, both
@@ -501,7 +485,6 @@ static dlsym_t g_real_dlsym = nullptr;
 static void patch_cached_tfrsn();
 
 static void* wrap_dlsym(void* handle, const char* symbol) {
-    heif_keys_rename();
     void* res = g_real_dlsym(handle, symbol);
 
     if (res && symbol && !strcmp(symbol, "ARC_DCIR_Process")) {
@@ -1585,6 +1568,41 @@ static bool hook_one(const char* name, void* wrap, void** real_out, bool* done) 
     return true;
 }
 
+// cmd-jni defines this find itself (weak), so its own calls go through a
+// JUMP_SLOT. cmd-jni loads before libAlgoProcess, so this lands first try.
+static const char kMapFindSym[] =
+    "_ZNSt6__ndk16__treeINS_12__value_typeINS_12basic_stringIcNS_11char_traitsIcEENS_9allocator"
+    "IcEEEENS_6vectorIS7_NS5_IS7_EEEEEENS_19__map_value_compareIS7_SB_NS_4lessIS7_EELb1EEENS5_"
+    "ISB_EEE4findIS7_EENS_15__tree_iteratorISB_PNS_11__tree_nodeISB_PvEElEERKT_";
+static bool g_mapfind_done = false;
+static bool g_mapfind_found = false;
+static uint64_t g_mapfind_got = 0;
+static uint64_t g_mapfind_func = 0;
+
+static bool hook_mapfind() {
+    if (g_mapfind_done) return true;
+    uint64_t base;
+    if (!module_base("libAPSClient-cmd-jni.so", &base)) return false;
+    if (!g_mapfind_found) {
+        if (!elf_find_jmpslot(base, 0x200000, kMapFindSym, false, &g_mapfind_got,
+                              &g_mapfind_func))
+            return false;
+        g_mapfind_found = true;
+        LOGI("ELF cmd-jni map find GOT=+0x%llx func=+0x%llx", (unsigned long long)g_mapfind_got,
+             (unsigned long long)g_mapfind_func);
+    }
+    uint64_t slot = base + g_mapfind_got;
+    void* cur = nullptr;
+    if (!got_slot_mapped(slot, &cur) || cur != (void*)(base + g_mapfind_func)) return false;
+    // Set before the redirect: a concurrent find must never see a null real.
+    g_real_mapfind = (mapfind_t)cur;
+    void* old = nullptr;
+    if (!got_redirect(slot, (void*)wrap_mapfind, &old)) return false;
+    g_mapfind_done = true;
+    LOGI("GOT-hooked cmd-jni map find (real=%p)", old);
+    return true;
+}
+
 static bool hook_proc_req() {
     return hook_one(
         "_ZN6vendor3qti8hardware6camera13offlinecamera14implementation19OfflineCameraClient21"
@@ -1649,6 +1667,7 @@ static void try_install() {
     hook_hwjpeg();
     hook_dumpqj();
     hook_swenc();
+    hook_mapfind();
     patch_cached_tfrsn();
     qj_guard_refresh();
 }
@@ -1659,7 +1678,7 @@ static void* poller(void*) {
         uint64_t fusion = 0;
         bool have_fusion = module_base("libarcsoft_turbo_fusion_raw_super_night.so", &fusion);
         if (g_p010_done && g_dlsym_iface_done && g_dlsym_proc_done && g_proc_req_hooked &&
-            g_hwjpeg_hooked &&
+            g_hwjpeg_hooked && (g_mapfind_done || i > 2400) &&
             (g_tfrsn_patched || g_tfrsn_gaveup || (!have_fusion && i > 200)))
             break;
         usleep(25 * 1000);
