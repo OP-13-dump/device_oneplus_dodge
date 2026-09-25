@@ -266,8 +266,8 @@ static void dump_struct_once(uint8_t* b, uint64_t lim) {
 
 // The buffer rewrites were tuned on APS's dlsym HEIF/buffer route and misfire on
 // stock's Java route (g_HeifWinBufReflectJavaFlag set), so they only run on the
-// dlsym route. The Quick JPEG un-swap and the HEIF result label are the
-// exceptions: both are needed on the Java route too.
+// dlsym route. The Quick JPEG un-swap and the HEIF result label are needed on
+// the Java route too; the ref bitmap chroma fix only on the Java route.
 // debug.apsfixup.<name>=1/0 forces one on or off.
 static bool fix_on(const char* name) {
     char key[PROP_NAME_MAX], v[PROP_VALUE_MAX] = "";
@@ -286,6 +286,7 @@ static bool fix_on(const char* name) {
              java ? "off except qj" : "on");
     }
     if (!strcmp(name, "qj") || !strcmp(name, "heiftype")) return true;
+    if (!strcmp(name, "rgbuv")) return java;
     return !java;
 }
 
@@ -1761,10 +1762,40 @@ struct ApsKV {
 };
 typedef int (*setres_t)(void*, int, std::vector<ApsKV>*, void*);
 static setres_t g_real_setres = nullptr;
-static bool g_setres_done = false;
-static bool g_setres_found = false;
-static uint64_t g_setres_got = 0;
-static uint64_t g_setres_func = 0;
+
+// A JUMP_SLOT in libAlgoProcess for one of its own exports.
+struct AlgoGot {
+    const char* sym;
+    const char* tag;
+    void* wrap;
+    void** real;
+    bool done = false;
+    bool found = false;
+    uint64_t got = 0;
+    uint64_t func = 0;
+};
+
+static bool hook_algo_got(AlgoGot* h) {
+    if (h->done) return true;
+    uint64_t base;
+    if (!module_base("libAlgoProcess.so", &base)) return false;
+    if (!h->found) {
+        if (!elf_find_jmpslot(base, 0x800000, h->sym, false, &h->got, &h->func)) return false;
+        h->found = true;
+        LOGI("ELF %s GOT=+0x%llx func=+0x%llx", h->tag, (unsigned long long)h->got,
+             (unsigned long long)h->func);
+    }
+    uint64_t slot = base + h->got;
+    void* cur = nullptr;
+    if (!got_slot_mapped(slot, &cur) || cur != (void*)(base + h->func)) return false;
+    // Set before the redirect: a concurrent call must never see a null real.
+    *h->real = cur;
+    void* old = nullptr;
+    if (!got_redirect(slot, h->wrap, &old)) return false;
+    h->done = true;
+    LOGI("GOT-hooked %s (real=%p)", h->tag, old);
+    return true;
+}
 
 static int wrap_setres(void* cb, int type, std::vector<ApsKV>* kv, void* extra) {
     int rc = g_real_setres(cb, type, kv, extra);
@@ -1783,28 +1814,63 @@ static int wrap_setres(void* cb, int type, std::vector<ApsKV>* kv, void* extra) 
     return rc;
 }
 
-static bool hook_setres() {
-    if (g_setres_done) return true;
-    uint64_t base;
-    if (!module_base("libAlgoProcess.so", &base)) return false;
-    if (!g_setres_found) {
-        if (!elf_find_jmpslot(base, 0x800000, "camApsSetResultInfo", false, &g_setres_got,
-                              &g_setres_func))
-            return false;
-        g_setres_found = true;
-        LOGI("ELF camApsSetResultInfo GOT=+0x%llx func=+0x%llx", (unsigned long long)g_setres_got,
-             (unsigned long long)g_setres_func);
+static AlgoGot g_setres = {"camApsSetResultInfo", "camApsSetResultInfo", (void*)wrap_setres,
+                           (void**)&g_real_setres};
+
+// The quick bitmap the Gallery shows first is fillRefBitmap's CPU convert of
+// the quick YUV. That buffer is 0x23 allocated as NV21, the converter reads
+// chroma as UV (same handle misread), so the preview is Cb/Cr swapped. Hand it
+// a VU->UV copy of the chroma plane; the source buffer is not written.
+// ApsBufferPlanes: format +0x0, width +0x4, height +0x8, Y +0x18, UV +0x48,
+// UV row stride +0x54 (0 = width).
+typedef long (*yuv2rgba_t)(void*, void*);
+static yuv2rgba_t g_real_yuv2rgba = nullptr;
+
+static long wrap_yuv2rgba(void* planes, void* info) {
+    auto* p = reinterpret_cast<uint8_t*>(planes);
+    if (!p || !fix_on("rgbuv")) return g_real_yuv2rgba(planes, info);
+    int32_t fmt = *reinterpret_cast<int32_t*>(p);
+    int32_t w = *reinterpret_cast<int32_t*>(p + 0x4);
+    int32_t h = *reinterpret_cast<int32_t*>(p + 0x8);
+    auto** yp = reinterpret_cast<uint8_t**>(p + 0x18);
+    auto** uvp = reinterpret_cast<uint8_t**>(p + 0x48);
+    int32_t uvs = *reinterpret_cast<int32_t*>(p + 0x54);
+    if (uvs == 0) uvs = w;
+    if (fmt != 0x23 || !*uvp || w <= 0 || h <= 0 || ((w | h) & 1) || uvs < w)
+        return g_real_yuv2rgba(planes, info);
+    // Already flipped in place by the Quick JPEG un-swap: leave it.
+    qj_uv_lock();
+    bool done = qj_yuv_already((uint64_t)*yp);
+    qj_uv_unlock();
+    if (done) return g_real_yuv2rgba(planes, info);
+
+    size_t rows = (size_t)h / 2;
+    auto* tmp = static_cast<uint8_t*>(malloc((size_t)uvs * rows));
+    if (!tmp) return g_real_yuv2rgba(planes, info);
+    uint8_t* src = *uvp;
+    for (size_t r = 0; r < rows; r++) {
+        const uint8_t* s = src + r * (size_t)uvs;
+        uint8_t* d = tmp + r * (size_t)uvs;
+        for (int32_t x = 0; x + 1 < w; x += 2) {
+            d[x] = s[x + 1];
+            d[x + 1] = s[x];
+        }
     }
-    uint64_t slot = base + g_setres_got;
-    void* cur = nullptr;
-    if (!got_slot_mapped(slot, &cur) || cur != (void*)(base + g_setres_func)) return false;
-    g_real_setres = (setres_t)cur;
-    void* old = nullptr;
-    if (!got_redirect(slot, (void*)wrap_setres, &old)) return false;
-    g_setres_done = true;
-    LOGI("GOT-hooked camApsSetResultInfo (real=%p)", old);
-    return true;
+    *uvp = tmp;
+    long rc = g_real_yuv2rgba(planes, info);
+    *uvp = src;
+    free(tmp);
+    static int logged = 0;
+    if (logged < 3) {
+        logged++;
+        LOGI("ref bitmap %dx%d chroma VU->UV", w, h);
+    }
+    return rc;
 }
+
+static AlgoGot g_yuv2rgba = {
+    "_ZN18APSFormatConverter17yuv420sp2rgbaNeonERK15ApsBufferPlanesRK13buffer_info_t",
+    "yuv420sp2rgbaNeon", (void*)wrap_yuv2rgba, (void**)&g_real_yuv2rgba};
 
 static bool hook_proc_req() {
     return hook_one(
@@ -1871,7 +1937,8 @@ static void try_install() {
     hook_dumpqj();
     hook_swenc();
     hook_mapfind();
-    hook_setres();
+    hook_algo_got(&g_setres);
+    hook_algo_got(&g_yuv2rgba);
     patch_cached_tfrsn();
     qj_guard_refresh();
 }
@@ -1882,7 +1949,7 @@ static void* poller(void*) {
         uint64_t fusion = 0;
         bool have_fusion = module_base("libarcsoft_turbo_fusion_raw_super_night.so", &fusion);
         if (g_p010_done && g_dlsym_iface_done && g_dlsym_proc_done && g_proc_req_hooked &&
-            g_hwjpeg_hooked && (g_mapfind_done || i > 2400) && (g_setres_done || i > 2400) &&
+            g_hwjpeg_hooked && (g_mapfind_done || i > 2400) && ((g_setres.done && g_yuv2rgba.done) || i > 2400) &&
             (g_tfrsn_patched || g_tfrsn_gaveup || (!have_fusion && i > 200)))
             break;
         usleep(25 * 1000);
