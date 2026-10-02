@@ -22,5 +22,5 @@
     <dimen name="udfps_animation_offset">-12dp</dimen>
 
     <!-- Define bottom margin spacing for Dynamic Bar -->
-    <dimen name="ax_dynamic_bar_keyguard_chip_extra_bottom_margin">300px</dimen>
+    <dimen name="ax_dynamic_bar_keyguard_chip_extra_bottom_margin">330px</dimen>
 </resources>
