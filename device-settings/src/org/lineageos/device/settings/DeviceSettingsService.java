@@ -25,6 +25,7 @@ import androidx.preference.PreferenceManager;
 
 import org.lineageos.device.settings.bypasschrg.BypassChargingController;
 import org.lineageos.device.settings.bypasschrg.BypassChargingManager;
+import org.lineageos.device.settings.charging.PdModeController;
 import org.lineageos.device.settings.display.DisplayModeController;
 import org.lineageos.device.settings.display.HbmController;
 import org.lineageos.device.settings.display.PwmController;
@@ -74,11 +75,22 @@ public class DeviceSettingsService extends Service {
 
     private void initializeSubsystems() {
         initializeBypassCharging();
+        initializePdMode();
         initializeFastCharging();
         initializePwm();
         initializeTestTe();
         initializeSunlightBoost();
         initializeGameBar();
+    }
+
+    private void initializePdMode() {
+        if (Constants.DEBUG) Log.i(TAG, "Initializing PD mode");
+        try {
+            PdModeController.getInstance(this).restore();
+            if (Constants.DEBUG) Log.i(TAG, "PD mode initialized");
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to initialize PD mode", e);
+        }
     }
 
     private void initializeSunlightBoost() {
@@ -283,6 +295,12 @@ public class DeviceSettingsService extends Service {
             BypassChargingController.getInstance(this).handlePowerConnected();
         } catch (Exception e) {
             Log.e(TAG, "Failed to handle power connected", e);
+        }
+
+        try {
+            PdModeController.getInstance(this).restore();
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to restore PD mode on connect", e);
         }
 
         try {

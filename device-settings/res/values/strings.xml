@@ -67,6 +67,22 @@
     <string name="charging_speed_fast">Fast charge (100W)</string>
     <string name="charging_speed_night">Night mode (10W)</string>
 
+    <string name="pd_mode_title">PD mode</string>
+    <string name="pd_mode_automatic">Automatic</string>
+    <string name="pd_mode_fixed">Fixed PD</string>
+    <string name="pd_mode_5v">5V only</string>
+    <string name="charging_status_title">Charging status</string>
+    <string name="charging_status_disconnected">Protocol        Not connected
+PD mode         Automatic
+Contract        —
+Available       —
+Actual input    —
+Power draw      —
+Battery         —
+Battery temp    —
+Bypass          Disabled
+Charge limit    Disabled</string>
+
     <!-- Bypass chargings -->
     <string name="bypass_charging_category_title" translatable="false">@string/bypass_charging_title</string>
     <string name="bypass_charging_title">Bypass charging</string>

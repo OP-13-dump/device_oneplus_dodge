@@ -240,4 +240,16 @@
         <item>fast</item>
         <item>night</item>
     </string-array>
+
+    <string-array name="pd_mode_entries">
+        <item>@string/pd_mode_automatic</item>
+        <item>@string/pd_mode_fixed</item>
+        <item>@string/pd_mode_5v</item>
+    </string-array>
+
+    <string-array name="pd_mode_values" translatable="false">
+        <item>automatic</item>
+        <item>fixed</item>
+        <item>5v</item>
+    </string-array>
 </resources>

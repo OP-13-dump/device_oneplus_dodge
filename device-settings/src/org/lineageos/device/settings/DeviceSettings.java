@@ -24,6 +24,8 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.res.Resources;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.SystemProperties;
 import android.os.UserHandle;
 import android.text.TextUtils;
@@ -44,8 +46,12 @@ import com.android.settingslib.widget.SettingsBasePreferenceFragment;
 
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.Locale;
 
+import lineageos.health.HealthInterface;
 import org.lineageos.device.settings.Constants;
+import org.lineageos.device.settings.bypasschrg.BypassChargingController;
+import org.lineageos.device.settings.charging.PdModeController;
 import org.lineageos.device.settings.display.DisplayModeController;
 import org.lineageos.device.settings.display.HbmController;
 import org.lineageos.device.settings.display.PwmController;
@@ -75,12 +81,27 @@ public class DeviceSettings extends SettingsBasePreferenceFragment
     private SwitchPreferenceCompat mHbmSwitch;
     private SwitchPreferenceCompat mSunlightBoostSwitch;
     private ListPreference mHapticProfilePref;
+    private ListPreference mPdModePref;
     private ListPreference mChargingSpeedPref;
+    private Preference mChargingStatusPref;
 
     private HbmController mHbmController;
     private PwmController mPwmController;
     private DisplayModeController mDisplayModeController;
     private FastChargeController mFastChargeController;
+    private PdModeController mPdModeController;
+    private BypassChargingController mBypassChargingController;
+
+    private final Handler mChargingStatusHandler = new Handler(Looper.getMainLooper());
+    private final Runnable mChargingStatusRunnable = new Runnable() {
+        @Override
+        public void run() {
+            updateChargingStatus();
+            if (isResumed()) {
+                mChargingStatusHandler.postDelayed(this, 1000);
+            }
+        }
+    };
 
     @Override
     public void onCreatePreferences(Bundle savedInstanceState, String rootKey) {
@@ -90,6 +111,8 @@ public class DeviceSettings extends SettingsBasePreferenceFragment
         mPwmController = PwmController.getInstance(getContext());
         mDisplayModeController = DisplayModeController.getInstance(getContext());
         mFastChargeController = FastChargeController.getInstance(getContext());
+        mPdModeController = PdModeController.getInstance(getContext());
+        mBypassChargingController = BypassChargingController.getInstance(getContext());
 
         mOnePulsePWMSwitch = (SwitchPreferenceCompat) findPreference(Constants.KEY_ONEPULSE_PWM);
         if (FileUtils.isFileWritable(Constants.NODE_ONEPULSE_PWM)) {
@@ -116,6 +139,19 @@ public class DeviceSettings extends SettingsBasePreferenceFragment
             mSunlightBoostSwitch.setEnabled(false);
         }
 
+
+        mPdModePref = (ListPreference) findPreference(Constants.KEY_PD_MODE);
+        if (mPdModePref != null) {
+            if (mPdModeController.isSupported()) {
+                mPdModePref.setValue(mPdModeController.getMode());
+                mPdModePref.setSummary(mPdModePref.getEntry());
+                mPdModePref.setOnPreferenceChangeListener(this);
+            } else {
+                mPdModePref.setEnabled(false);
+            }
+        }
+
+        mChargingStatusPref = findPreference(Constants.KEY_CHARGING_STATUS);
 
         mChargingSpeedPref = (ListPreference) findPreference(Constants.KEY_CHARGING_SPEED);
         if (mChargingSpeedPref != null) {
@@ -147,15 +183,32 @@ public class DeviceSettings extends SettingsBasePreferenceFragment
         super.onResume();
         // Refresh state when returning to settings
         syncHbmPwmState();
+        if (mPdModePref != null) {
+            boolean pdModeSupported = mPdModeController.isSupported();
+            mPdModePref.setEnabled(pdModeSupported);
+            if (pdModeSupported) {
+                mPdModePref.setValue(mPdModeController.getMode());
+                mPdModePref.setSummary(mPdModePref.getEntry());
+            }
+        }
         if (mChargingSpeedPref != null && mFastChargeController.isSupported()) {
             mChargingSpeedPref.setValue(mFastChargeController.getChargingSpeedMode());
             mChargingSpeedPref.setSummary(mChargingSpeedPref.getEntry());
         }
+        updateChargingStatus();
+        mChargingStatusHandler.removeCallbacks(mChargingStatusRunnable);
+        mChargingStatusHandler.postDelayed(mChargingStatusRunnable, 1000);
         if (mHapticProfilePref != null) {
             String currentProfile = SystemProperties.get(Constants.PROP_HAPTIC_PROFILE, Constants.HAPTIC_PROFILE_DEFAULT);
             mHapticProfilePref.setValue(currentProfile);
             mHapticProfilePref.setSummary(mHapticProfilePref.getEntry());
         }
+    }
+
+    @Override
+    public void onPause() {
+        mChargingStatusHandler.removeCallbacks(mChargingStatusRunnable);
+        super.onPause();
     }
 
     /**
@@ -251,6 +304,17 @@ public class DeviceSettings extends SettingsBasePreferenceFragment
                 // Re-enable HBM toggle
                 mHbmSwitch.setEnabled(FileUtils.isFileWritable(Constants.NODE_HBM));
             }
+            return true;
+        } else if (preference == mPdModePref) {
+            String mode = (String) newValue;
+            if (!mPdModeController.setMode(mode)) {
+                return false;
+            }
+            int index = mPdModePref.findIndexOfValue(mode);
+            if (index >= 0) {
+                mPdModePref.setSummary(mPdModePref.getEntries()[index]);
+            }
+            updateChargingStatus();
             return true;
         } else if (preference == mChargingSpeedPref) {
             String mode = (String) newValue;
@@ -715,5 +779,133 @@ public class DeviceSettings extends SettingsBasePreferenceFragment
             default:
                 return 0;
         }
+    }
+
+    private void updateChargingStatus() {
+        if (mChargingStatusPref == null || mPdModeController == null) return;
+
+        String protocol = readText(Constants.NODE_CHARGER_PROTOCOL, "Not connected");
+        String pdMode = getPdModeLabel(mPdModeController.getMode());
+        int[] contract = readPair(Constants.NODE_PD_CONTRACT);
+        int[] input = readPair(Constants.NODE_CHARGING_INPUT);
+        int pdAvailablePowerMw = readInt(Constants.NODE_PD_AVAILABLE_POWER, 0);
+        int adapterPowerMw = readInt(Constants.NODE_ADAPTER_POWER, 0);
+        int battCurrentMa = readInt(Constants.NODE_BATTERY_CURRENT, 0);
+        int battTempDeciC = readInt(Constants.NODE_BATTERY_TEMP, Integer.MIN_VALUE);
+
+        String contractText = formatVi(contract[0], contract[1]);
+        double availableW = (pdAvailablePowerMw > 0 ? pdAvailablePowerMw : adapterPowerMw) / 1000.0;
+        String availableText = availableW > 0.0
+                ? String.format(Locale.US, "%.1f W", availableW) : "—";
+        boolean inputCurrentValid = input[0] > 0 && Math.abs(input[1]) >= 50;
+        double drawW;
+        String inputText;
+        if (inputCurrentValid) {
+            inputText = formatVi(input[0], input[1]);
+            drawW = (input[0] * (double) Math.abs(input[1])) / 1_000_000.0;
+        } else if (input[0] > 0 && battCurrentMa < -50) {
+            int battUv = readInt(Constants.NODE_BATTERY_VOLTAGE, 0);
+            int battMv = battUv > 0 ? (battUv / 1000) : 8000;
+            drawW = (battMv * (double) Math.abs(battCurrentMa)) / 1_000_000.0 / 0.90;
+            int estMa = (int) ((drawW * 1_000_000.0) / input[0]);
+            inputText = formatVi(input[0], estMa);
+        } else if (input[0] > 0) {
+            inputText = String.format(Locale.US, "%.2f V · current unavailable", input[0] / 1000.0);
+            drawW = 0.0;
+        } else {
+            inputText = "Not reported";
+            drawW = 0.0;
+        }
+        String drawText = drawW > 0.0
+                ? String.format(Locale.US, "%.1f W", drawW)
+                : "Not reported";
+
+        // Oplus gauge current is negative while charging. Present positive as
+        // current entering the battery, which makes bypass settle near +0.00 A.
+        String batteryText = String.format(Locale.US, "%+.2f A", -battCurrentMa / 1000.0);
+        String batteryTempText = battTempDeciC != Integer.MIN_VALUE
+                ? String.format(Locale.US, "%.1f °C", battTempDeciC / 10.0)
+                : "Not reported";
+
+        String bypassText;
+        if (mBypassChargingController != null) {
+            BypassChargingController.BypassState bypass = mBypassChargingController.getState();
+            if (bypass.globalStatus == Constants.BYPASS_ON
+                    || (bypass.activeApp != null && bypass.currentLevel >= bypass.targetLevel)) {
+                bypassText = "Active";
+            } else if (bypass.globalStatus == Constants.BYPASS_WAITING || bypass.activeApp != null) {
+                bypassText = String.format(Locale.US, "Waiting · %d%%", bypass.targetLevel);
+            } else {
+                bypassText = "Disabled";
+            }
+        } else {
+            bypassText = "Disabled";
+        }
+
+        String limitText;
+        try {
+            HealthInterface health = HealthInterface.getInstance(getContext());
+            limitText = (health != null && health.getEnabled())
+                    ? String.format(Locale.US, "Active · %d%%", health.getLimit())
+                    : "Disabled";
+        } catch (Exception e) {
+            limitText = "Disabled";
+        }
+
+        String summary = String.format(Locale.US,
+                "Protocol        %s\n" +
+                "PD mode         %s\n" +
+                "Contract        %s\n" +
+                "Available       %s\n" +
+                "Actual input    %s\n" +
+                "Power draw      %s\n" +
+                "Battery         %s\n" +
+                "Battery temp    %s\n" +
+                "Bypass          %s\n" +
+                "Charge limit    %s",
+                protocol, pdMode, contractText, availableText, inputText,
+                drawText, batteryText, batteryTempText, bypassText, limitText);
+        mChargingStatusPref.setSummary(summary);
+    }
+
+    private String getPdModeLabel(String mode) {
+        if (Constants.PD_MODE_FIXED.equals(mode)) return getString(R.string.pd_mode_fixed);
+        if (Constants.PD_MODE_5V.equals(mode)) return getString(R.string.pd_mode_5v);
+        return getString(R.string.pd_mode_automatic);
+    }
+
+    private static String readText(String path, String fallback) {
+        String value = FileUtils.readLineTrimmed(path);
+        return TextUtils.isEmpty(value) ? fallback : value;
+    }
+
+    private static int readInt(String path, int fallback) {
+        try {
+            String value = FileUtils.readLineTrimmed(path);
+            return TextUtils.isEmpty(value) ? fallback : Integer.parseInt(value);
+        } catch (NumberFormatException e) {
+            return fallback;
+        }
+    }
+
+    private static int[] readPair(String path) {
+        int[] result = {0, 0};
+        String value = FileUtils.readLineTrimmed(path);
+        if (TextUtils.isEmpty(value)) return result;
+        String[] parts = value.trim().split("\\s+");
+        if (parts.length < 2) return result;
+        try {
+            result[0] = Integer.parseInt(parts[0]);
+            result[1] = Integer.parseInt(parts[1]);
+        } catch (NumberFormatException ignored) {
+            result[0] = 0;
+            result[1] = 0;
+        }
+        return result;
+    }
+
+    private static String formatVi(int mv, int ma) {
+        if (mv <= 0 || ma == 0) return "—";
+        return String.format(Locale.US, "%.2f V × %.2f A", mv / 1000.0, Math.abs(ma) / 1000.0);
     }
 }

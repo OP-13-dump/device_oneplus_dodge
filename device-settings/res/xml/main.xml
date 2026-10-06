@@ -128,6 +128,16 @@
             android:fragment="org.lineageos.device.settings.bypasschrg.BypassChargingFragment" />
 
         <ListPreference
+            android:key="pd_mode"
+            android:icon="@drawable/ic_fast_charging"
+            android:title="@string/pd_mode_title"
+            android:dialogTitle="@string/pd_mode_title"
+            android:entries="@array/pd_mode_entries"
+            android:entryValues="@array/pd_mode_values"
+            android:defaultValue="automatic"
+            android:summary="%s" />
+
+        <ListPreference
             android:key="charging_speed"
             android:icon="@drawable/ic_fast_charging"
             android:title="@string/charging_speed_title"
@@ -136,6 +146,13 @@
             android:entryValues="@array/charging_speed_values"
             android:defaultValue="default"
             android:summary="%s" />
+
+        <Preference
+            android:key="charging_status"
+            android:title="@string/charging_status_title"
+            android:summary="@string/charging_status_disconnected"
+            android:persistent="false"
+            android:selectable="false" />
 
     </PreferenceCategory>
 

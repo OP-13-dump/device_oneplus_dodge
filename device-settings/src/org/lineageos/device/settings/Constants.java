@@ -116,6 +116,17 @@ public class Constants {
 
     /* Fast charging current cap */
     public static final String NODE_FAST_CHARGING = "/sys/class/oplus_chg/battery/cool_down";
+    public static final String NODE_PD_MODE = "/sys/class/oplus_chg/battery/pd_mode";
+    public static final String NODE_PD_CONTRACT = "/sys/class/oplus_chg/battery/pd_contract";
+    public static final String NODE_PD_AVAILABLE_POWER = "/sys/class/oplus_chg/battery/pd_available_power";
+    public static final String NODE_CHARGER_PROTOCOL = "/sys/class/oplus_chg/battery/charger_protocol";
+    public static final String NODE_CHARGING_INPUT = "/sys/class/oplus_chg/battery/charging_input";
+    public static final String NODE_BATTERY_CURRENT = "/sys/class/oplus_chg/battery/battery_current";
+    public static final String NODE_BATTERY_VOLTAGE = "/sys/class/power_supply/battery/voltage_now";
+    public static final String NODE_BATTERY_TEMP = "/sys/class/power_supply/battery/temp";
+    public static final String NODE_ADAPTER_POWER = "/sys/class/oplus_chg/common/adapter_power";
+    public static final String KEY_PD_MODE = "pd_mode";
+    public static final String KEY_CHARGING_STATUS = "charging_status";
     public static final String KEY_CHARGING_SPEED = "charging_speed";
     public static final String KEY_FAST_CHARGING = "fast_charging";
     public static final String KEY_NIGHT_CHARGING = "night_charging";
@@ -123,6 +134,10 @@ public class Constants {
     public static final String CHARGING_SPEED_DEFAULT = "default";
     public static final String CHARGING_SPEED_FAST = "fast";
     public static final String CHARGING_SPEED_NIGHT = "night";
+
+    public static final String PD_MODE_AUTOMATIC = "automatic";
+    public static final String PD_MODE_FIXED = "fixed";
+    public static final String PD_MODE_5V = "5v";
 
     public static final String ACTION_CHARGING_SPEED_CHANGED =
             "org.lineageos.device.settings.action.CHARGING_SPEED_CHANGED";
