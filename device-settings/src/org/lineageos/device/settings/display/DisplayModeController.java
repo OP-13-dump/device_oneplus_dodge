@@ -15,8 +15,6 @@
  *   change (covers two-tap HBM-off tile then PWM-on, not only in-line teardown)
  * - Cross-tile UI sync via TileService.requestListeningState (not a broadcast):
  *   PWM change → HBM tile (HBM available only when PWM off)
- *   HBM change → RefreshRate tile (locked while HBM on); also when PWM tears HBM
- *   down, RR must unlock
  */
 package org.lineageos.device.settings.display;
 
@@ -26,7 +24,6 @@ import android.service.quicksettings.TileService;
 import android.util.Log;
 
 import org.lineageos.device.settings.Constants;
-import org.lineageos.device.settings.refreshrate.RefreshRateTile;
 
 public class DisplayModeController {
     private static final String TAG = "DisplayModeController";
@@ -73,13 +70,6 @@ public class DisplayModeController {
         return true;
     }
 
-    /**
-     * Refresh rate changes blocked when HBM is active (locked to 120Hz)
-     */
-    public boolean canChangeRefreshRate() {
-        return !mHbmController.isHbmEnabled();
-    }
-
     // ===== State Mutations (serialized) =====
 
     public synchronized boolean enableHbm() {
@@ -88,30 +78,19 @@ public class DisplayModeController {
             return false;
         }
 
-        boolean success = mHbmController.enableHbm();
-        if (success) {
-            // RR greys out while HBM is on
-            requestTileListening(RefreshRateTile.class);
-        }
-        return success;
+        return mHbmController.enableHbm();
     }
 
     public synchronized boolean disableHbm() {
-        boolean success = mHbmController.disableHbm();
-        if (success) {
-            // RR unlocks when HBM is off
-            requestTileListening(RefreshRateTile.class);
-        }
-        return success;
+        return mHbmController.disableHbm();
     }
 
     public synchronized boolean enablePwm() {
         // PwmController tears HBM down + settles, then enables PWM
         boolean success = mPwmController.enablePwm();
         if (success) {
-            // HBM becomes unavailable (PWM has priority); RR unlocks if HBM was forced off
+            // HBM becomes unavailable (PWM has priority)
             requestTileListening(HbmTile.class);
-            requestTileListening(RefreshRateTile.class);
         }
         return success;
     }
@@ -148,6 +127,5 @@ public class DisplayModeController {
     public void broadcastStateChange() {
         requestTileListening(HbmTile.class);
         requestTileListening(PwmTile.class);
-        requestTileListening(RefreshRateTile.class);
     }
 }

@@ -211,21 +211,6 @@
         <item>2000</item>
     </string-array>
 
-    <!-- Refresh Rate -->
-    <string-array name="refresh_rate_entries">
-        <item>@string/refresh_rate_auto</item>
-        <item>@string/refresh_rate_60hz</item>
-        <item>@string/refresh_rate_90hz</item>
-        <item>@string/refresh_rate_120hz</item>
-    </string-array>
-
-    <string-array name="refresh_rate_values">
-        <item>0</item>
-        <item>60</item>
-        <item>90</item>
-        <item>120</item>
-    </string-array>
-
     <!-- Haptic Profiles -->
     <string-array name="haptic_profile_entries">
         <item>@string/haptic_profile_op13gentle</item>

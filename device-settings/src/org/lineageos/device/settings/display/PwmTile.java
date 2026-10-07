@@ -39,8 +39,8 @@ public class PwmTile extends TileService {
 
         final boolean turningOff = currentState;
         new Thread(() -> {
-            // enablePwm forces HBM off → DisplayModeController requestListeningState(HbmTile)
-            // and RefreshRateTile; disablePwm unlocks HbmTile the same way.
+            // enablePwm forces HBM off → DisplayModeController requestListeningState(HbmTile);
+            // disablePwm unlocks HbmTile the same way.
             boolean success = turningOff
                     ? mController.disablePwm()
                     : mController.enablePwm();

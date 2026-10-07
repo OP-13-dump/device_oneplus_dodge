@@ -97,6 +97,7 @@
             android:title="@string/sunlight_boost_title"
             android:summary="@string/sunlight_boost_summary" />
 
+
     </PreferenceCategory>
 
     <PreferenceCategory
@@ -141,13 +142,6 @@
     <PreferenceCategory
         android:key="gaming"
         android:title="@string/gaming_category_title">
-
-        <Preference
-            android:key="refresh_rate"
-            android:icon="@drawable/ic_refresh_rate"
-            android:title="@string/refresh_rate_app_title"
-            android:summary="@string/refresh_rate_app_summary"
-            android:fragment="org.lineageos.device.settings.refreshrate.RefreshRateFragment" />
 
         <Preference
             android:key="game_bar"
