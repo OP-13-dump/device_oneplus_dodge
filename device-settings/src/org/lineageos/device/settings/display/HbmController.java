@@ -13,7 +13,6 @@ import android.util.Log;
 import androidx.preference.PreferenceManager;
 
 import org.lineageos.device.settings.Constants;
-import org.lineageos.device.settings.refreshrate.RefreshRateMonitorService;
 import org.lineageos.device.settings.utils.FileUtils;
 
 public class HbmController {
@@ -22,16 +21,6 @@ public class HbmController {
     private final Context mContext;
     private final SharedPreferences mSharedPrefs;
 
-    private static final float MAX = 120.0f;
-    // HBM (hbm_max, the sunlight boost) needs the panel at one stable rate. Dynamic
-    // RR lets SF timing-switch 60<->120, and each switch reprograms the panel drive
-    // registers + re-latches, dropping it out of HBM (visible flash); auto would also
-    // let the DDIC self-refresh down-clock beneath the mode. So pin BOTH halves - SF
-    // MIN=PEAK=120 (no switches) and adfr_min_fps=120 (no down-clock). On disable,
-    // hand the refresh rate back to RefreshRateMonitorService (the single owner of
-    // the user's baseline); no local backup/restore, which is what used to weld
-    // auto->120 when pins overlapped.
-    private static final float HBM_FRAMERATE = MAX;
     private static final String KEY_BACKUP_AUTO_BRIGHTNESS = "hbm_backup_auto_brightness";
 
     private HbmController(Context context) {
@@ -69,12 +58,6 @@ public class HbmController {
         if (prefState != nodeState) {
             mSharedPrefs.edit().putBoolean(Constants.KEY_HBM, nodeState).commit();
             Log.i(TAG, "HBM state synced to node: " + nodeState);
-            if (prefState && !nodeState) {
-                // HBM was released by the kernel (sleep safeguard) while our RR was
-                // pinned to 120Hz. Hand the refresh rate back to the monitor so the
-                // user's baseline is restored instead of staying welded at 120.
-                RefreshRateMonitorService.notifyStateChanged(mContext);
-            }
         }
         return nodeState;
     }
@@ -127,16 +110,7 @@ public class HbmController {
             Log.i(TAG, "Auto-brightness disabled for HBM");
         }
 
-        // 2. Pin the refresh rate: adfr_min_fps first (kernel self-refresh floor),
-        // then SF MIN=PEAK so SF stops timing-switching. No backup here -
-        // RefreshRateMonitorService owns the user's baseline and restores it
-        // when the pin is released.
-        FileUtils.writeLine(Constants.NODE_ADFR_MIN_FPS,
-                String.valueOf((int) HBM_FRAMERATE));
-        setRefreshRate(HBM_FRAMERATE, HBM_FRAMERATE);
-        Log.i(TAG, "HBM: pinned refresh rate to " + HBM_FRAMERATE);
-
-        // 3. Write HBM sysfs node; only persist pref when the node matches
+        // 2. Write HBM sysfs node; only persist pref when the node matches
         if (!writeHbmNode(true)) {
             return false;
         }
@@ -146,7 +120,7 @@ public class HbmController {
     }
 
     private boolean disableHbmInternal() {
-        // 1. Disable HBM sysfs node first, so the monitor below sees HBM off.
+        // 1. Disable HBM sysfs node first
         if (!writeHbmNode(false)) {
             return false;
         }
@@ -162,11 +136,7 @@ public class HbmController {
                 .putBoolean(Constants.KEY_HBM, false)
                 .remove(KEY_BACKUP_AUTO_BRIGHTNESS)
                 .commit();
-
-        // 3. Hand the refresh rate back to RefreshRateMonitorService: it re-applies
-        // the user's baseline (tile / per-app / auto / LTPO).
-        RefreshRateMonitorService.notifyStateChanged(mContext);
-        Log.i(TAG, "HBM sysfs node disabled; refresh rate handed to monitor");
+        Log.i(TAG, "HBM sysfs node disabled");
         return true;
     }
 
@@ -182,13 +152,6 @@ public class HbmController {
             return false;
         }
         return true;
-    }
-
-    private void setRefreshRate(float min, float peak) {
-        Settings.System.putFloatForUser(mContext.getContentResolver(),
-                Settings.System.MIN_REFRESH_RATE, min, UserHandle.USER_CURRENT);
-        Settings.System.putFloatForUser(mContext.getContentResolver(),
-                Settings.System.PEAK_REFRESH_RATE, peak, UserHandle.USER_CURRENT);
     }
 
     private boolean isAutoBrightnessEnabled() {
