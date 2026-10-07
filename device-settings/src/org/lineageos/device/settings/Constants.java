@@ -157,7 +157,7 @@ public class Constants {
      *  stock hbm_lux_table thresholds (enter 40000 lux, exit 20000 lux). */
     public static final String KEY_SUNLIGHT_BOOST = "sunlight_boost";
 
-    /** Panel test-TE counter: real DDIC self-refresh rate (LTPO). Write "1" to
+    /** Panel test-TE counter: real DDIC self-refresh rate. Write "1" to
      *  enable the irq (done at boot by DeviceSettingsService); reads return the
      *  measured rate, or 0 until two TE pulses have been observed. Consumed by the
      *  SurfaceFlinger "Show refresh rate" overlay via
@@ -170,32 +170,6 @@ public class Constants {
      *  The sm8750 (sun) kernel names the CRTC sysfs device "card0-sde-crtc-0"
      *  (device_create "card%d-sde-crtc-%d"), unlike sm8550/sm8650's "sde-crtc-0". */
     public static final String NODE_MEASURED_FPS = "/sys/class/drm/card0-sde-crtc-0/measured_fps";
-
-    /** ADFR/LTPO min fps request: 0 = auto (panel self-refresh drops to the
-     *  timing's lowest table entry: 20Hz active floor, 1Hz idle), N = fixed
-     *  (kernel clamps into the current timing's table, so writing the tile
-     *  rate pins the DDIC at the mode rate). Applied by the kernel
-     *  immediately and re-applied on every panel enable/timing switch. */
-    public static final String NODE_ADFR_MIN_FPS = "/sys/kernel/oplus_display/min_fps";
-
-    /** LTPO (adaptive refresh) master switch: on = panel self-refresh floor is
-     *  dynamic (min_fps 0 -> kernel maps to 1: 20Hz active floor, 1Hz idle),
-     *  off = panel pinned to the mode rate (no idle drop). The kernel re-arms
-     *  sa_min_fps=1 on every screen-on/timing switch, so DeviceSettingsService
-     *  re-applies this state on ACTION_SCREEN_ON. */
-    public static final String KEY_LTPO_ENABLED = "ltpo_enabled";
-
-    /** Broadcast sent whenever the LTPO master switch changes, so the QS tile
-     *  (LtpoTile) and any other UI stays in sync. Package-scoped, same app. */
-    public static final String ACTION_LTPO_STATE_CHANGED =
-            "org.lineageos.device.settings.action.LTPO_STATE_CHANGED";
-
-    /** Refresh rate */
-    public static final String KEY_REFRESH_RATE_MODE = "refresh_rate_mode";
-    /** SharedPreferences key for per-app refresh rate overrides (pipe-separated "pkg:fps|pkg:fps") */
-    public static final String KEY_REFRESH_RATE_APPS = "refresh_rate_apps";
-    /** 0 = auto: leave the system refresh rate settings untouched */
-    public static final int REFRESH_RATE_DEFAULT = 0;
 
     /* Haptic profile */
     public static final String KEY_HAPTIC_PROFILE = "haptic_profile";

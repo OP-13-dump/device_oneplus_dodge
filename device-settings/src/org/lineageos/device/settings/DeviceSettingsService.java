@@ -32,8 +32,6 @@ import org.lineageos.device.settings.display.SunlightBoostController;
 import org.lineageos.device.settings.fastcharge.FastChargeController;
 import org.lineageos.device.settings.gamebar.GameBar;
 import org.lineageos.device.settings.gamebar.GameBarMonitorService;
-import org.lineageos.device.settings.refreshrate.RefreshRateController;
-import org.lineageos.device.settings.refreshrate.RefreshRateMonitorService;
 import org.lineageos.device.settings.utils.FileUtils;
 
 public class DeviceSettingsService extends Service {
@@ -81,7 +79,6 @@ public class DeviceSettingsService extends Service {
         initializeTestTe();
         initializeSunlightBoost();
         initializeGameBar();
-        initializeRefreshRate();
     }
 
     private void initializeSunlightBoost() {
@@ -171,16 +168,6 @@ public class DeviceSettingsService extends Service {
         }
     }
 
-    private void initializeRefreshRate() {
-        if (Constants.DEBUG) Log.i(TAG, "Initializing RefreshRate");
-        try {
-            RefreshRateController.getInstance(this);
-            RefreshRateMonitorService.notifyStateChanged(this);
-            if (Constants.DEBUG) Log.i(TAG, "RefreshRate initialized");
-        } catch (Exception e) {
-            Log.e(TAG, "Failed to initialize RefreshRate", e);
-        }
-    }
 
     // ===== Receivers =====
 
@@ -269,15 +256,6 @@ public class DeviceSettingsService extends Service {
             Log.e(TAG, "Failed to sync HBM state on screen on", e);
         }
 
-        // The kernel ADFR status_reset() re-arms sa_min_fps=1 on every panel
-        // enable/timing switch, which would silently re-enable LTPO after a
-        // screen-off/on. Re-apply the persisted refresh-rate state (including
-        // the LTPO master switch) so the user's choice survives.
-        try {
-            RefreshRateMonitorService.notifyStateChanged(this);
-        } catch (Exception e) {
-            Log.e(TAG, "Failed to re-apply refresh rate on screen on", e);
-        }
 
         // Restart GameBar if needed
         try {

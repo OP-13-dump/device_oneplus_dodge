@@ -116,6 +116,7 @@ public class DeviceSettings extends SettingsBasePreferenceFragment
             mSunlightBoostSwitch.setEnabled(false);
         }
 
+
         mChargingSpeedPref = (ListPreference) findPreference(Constants.KEY_CHARGING_SPEED);
         if (mChargingSpeedPref != null) {
             if (mFastChargeController.isSupported()) {

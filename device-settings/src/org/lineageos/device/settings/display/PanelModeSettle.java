@@ -16,7 +16,7 @@ final class PanelModeSettle {
     private static final String TAG = "PanelModeSettle";
 
     /**
-     * ~2 frames + ADFR kickoff. dmesg showed ~11 ms HBM EXIT → PWM on is too short.
+     * ~2 frames + panel refresh kickoff. dmesg showed ~11 ms HBM EXIT → PWM on is too short.
      */
     static final long SETTLE_MS = 150L;
 

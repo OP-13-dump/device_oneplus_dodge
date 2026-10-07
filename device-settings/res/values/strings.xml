@@ -255,30 +255,9 @@
     <string name="hbm_btn_enable">Enable</string>
     <string name="hbm_warning_dont_show_again">Don\'t show this warning again</string>
 
-    <!-- Refresh Rate Settings -->
-    <string name="refresh_rate_title">Refresh rate</string>
-    <string name="refresh_rate_app_title">Per-App Refresh Rate</string>
-    <string name="refresh_rate_app_summary">Customize refresh rate per application</string>
-    <string name="refresh_rate_settings">Display Refresh Rate</string>
-    <string name="refresh_rate_global_title">Global Refresh Rate</string>
-    <string name="refresh_rate_global_summary">Default refresh rate for all apps</string>
-    <string name="refresh_rate_overrides_title">Per-App Overrides</string>
-    <string name="refresh_rate_app_title_dialog">Select Refresh Rate</string>
-    <string name="no_app_overrides">No app-specific overrides configured</string>
-    <string name="ltpo_title">LTPO (adaptive refresh rate)</string>
-    <string name="ltpo_summary">Allow the panel to self-refresh at low rates (down to 1 Hz) when the screen is idle, saving power</string>
-    <string name="ltpo_tile_label">LTPO</string>
-    <string name="ltpo_tile_description">Toggle adaptive (LTPO) refresh rate</string>
-    <string name="ltpo_adaptive">Adaptive</string>
-    <string name="ltpo_fixed">Fixed</string>
-    <string name="refresh_rate_auto">Auto</string>
-    <string name="refresh_rate_60hz" translatable="false"> 60 Hz</string>
-    <string name="refresh_rate_90hz" translatable="false"> 90 Hz</string>
-    <string name="refresh_rate_120hz" translatable="false">120 Hz</string>
 
-    <!-- HBM/PWM/RefreshRate tile messages -->
+    <!-- HBM/PWM tile messages -->
     <string name="hbm_unavailable_pwm_active">PWM is active</string>
-    <string name="refresh_rate_locked_hbm">Locked at 120Hz (HBM)</string>
 
     <!-- Vibration & Haptics -->
     <string name="vibration_category_title">Vibration &amp; Haptics</string>
