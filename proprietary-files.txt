@@ -1673,6 +1673,7 @@ odm/etc/wifi/peach/bdwlang.b0i
 odm/etc/wifi/peach/bdwlang.elf
 odm/etc/wifi/peach/regdb.bin
 odm/etc/wifi/peach/regdb_version
+odm/vendor/etc/wifi/WCNSS_qcom_cfg.ini
 
 # Camera
 vendor/lib64/libutils.so:vendor/lib64/libutils-stock.so;FIX_SONAME
