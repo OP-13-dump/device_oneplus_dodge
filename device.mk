@@ -37,6 +37,10 @@ TARGET_HAS_UDFPS := true
 # LiveDisplay
 $(call soong_config_set_bool,OPLUS_LINEAGE_LIVEDISPLAY_HAL,ENABLE_AF,true)
 
+# Maintainer
+PRODUCT_SYSTEM_DEFAULT_PROPERTIES += \
+    ro.lunaris.maintainer=No_Cache
+
 # Overlays
 DEVICE_PACKAGE_OVERLAYS += \
     $(LOCAL_PATH)/overlay-lineage
