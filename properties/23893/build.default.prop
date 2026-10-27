@@ -9,3 +9,6 @@ persist.vendor.nfc.config_file_name=libnfc-mtp-SN220.conf_23893
 # AI pipeline fallback
 ro.oplus.pipeline.region?=EUEX
 ro.oplus.pipeline_key?=EUEX
+
+# Widevine
+vendor.wv.oemcrypto.debug.enable_prov40=true
