@@ -135,6 +135,11 @@ def set_super_text_not_support(ctx, file, file_path, *args, **kwargs):
         update_vendor_tag(ctx, file, file_path, tag, "0")
 
 blob_fixups: blob_fixups_user_type = {
+    'odm/etc/resourcemanager.xml': blob_fixup()
+        .regex_replace(
+            r'(<name>PAL_STREAM_VOIP_TX</name>\s*<policies>\s*<ec_ref>\s*)(?!\s*<disabled_stream>PAL_STREAM_LOW_LATENCY)',
+            r'\1<disabled_stream>PAL_STREAM_LOW_LATENCY</disabled_stream>\n                        <disabled_stream>PAL_STREAM_ULTRA_LOW_LATENCY</disabled_stream>\n                        ',
+        ),
     'odm/etc/init/init.camera_process.rc': blob_fixup()
         .regex_replace('    delete_recursion', '    #delete_recursion'),
     'odm/firmware/fastchg/23821/charging_hyper_mode_config.txt': blob_fixup()

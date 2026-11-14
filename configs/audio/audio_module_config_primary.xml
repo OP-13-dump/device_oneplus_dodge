@@ -10,14 +10,11 @@ SPDX-License-Identifier: BSD-3-Clause-Clear
         output flags-->
         <!-- start of source mixports-->
         <mixPort name="low_latency_out" role="source" flags="FAST PRIMARY" maxOpenCount="2" maxActiveCount="2">
-            <!-- #ifndef OPLUS_FEATURE_PLAYBACK_24BIT
-            // Jianfeng.Qiu@MULTIMEDIA.AUDIODRIVER.HAL, 2024/05/15, Modify for support playback with 24bits
             <profile samplingRates="48000" channelLayouts="LAYOUT_STEREO" formatType="PCM" pcmType="INT_16_BIT" />
-            #else /* OPLUS_FEATURE_PLAYBACK_24BIT */-->
             <profile samplingRates="48000" channelLayouts="LAYOUT_STEREO" formatType="PCM" pcmType="INT_24_BIT" />
-            <!-- #endif OPLUS_FEATURE_PLAYBACK_24BIT -->
         </mixPort>
         <mixPort name="raw_out" role="source" flags="FAST RAW">
+            <profile samplingRates="48000" channelLayouts="LAYOUT_STEREO" formatType="PCM" pcmType="INT_16_BIT" />
             <profile samplingRates="48000" channelLayouts="LAYOUT_STEREO" formatType="PCM" pcmType="INT_24_BIT" />
         </mixPort>
         <mixPort name="haptics_out" role="source" flags="FAST">
