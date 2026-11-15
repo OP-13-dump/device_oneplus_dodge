@@ -155,6 +155,17 @@ public class DeviceSettingsService extends Service {
         }
     }
 
+    private void disableTestTe() {
+        try {
+            if (FileUtils.isFileWritable(Constants.NODE_TEST_TE)) {
+                FileUtils.writeLine(Constants.NODE_TEST_TE, "0");
+                if (Constants.DEBUG) Log.i(TAG, "Test-TE counter disabled");
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to disable test-TE counter", e);
+        }
+    }
+
     private void initializeGameBar() {
         if (Constants.DEBUG) Log.i(TAG, "Initializing GameBar");
         try {
@@ -244,6 +255,8 @@ public class DeviceSettingsService extends Service {
         // (oplus_display_set_power resets hbm_max on DPMS OFF/LP so the UI can't
         // freeze with HBM latched). We only sync our displayed state on screen-on.
 
+        disableTestTe();
+
         // Stop GameBar
         try {
             GameBar.getInstance(this).hide();
@@ -257,6 +270,8 @@ public class DeviceSettingsService extends Service {
 
     private void handleScreenOn() {
         if (Constants.DEBUG) Log.i(TAG, "Screen ON");
+
+        initializeTestTe();
 
         // Sync HBM state: the kernel forced hbm_max off while the panel slept, so
         // reconcile our preference to the node and refresh the tile/switch, which
