@@ -33,6 +33,7 @@ import org.lineageos.device.settings.display.SunlightBoostController;
 import org.lineageos.device.settings.fastcharge.FastChargeController;
 import org.lineageos.device.settings.gamebar.GameBar;
 import org.lineageos.device.settings.gamebar.GameBarMonitorService;
+import org.lineageos.device.settings.haptics.OHapticsController;
 import org.lineageos.device.settings.utils.FileUtils;
 
 public class DeviceSettingsService extends Service {
@@ -81,6 +82,15 @@ public class DeviceSettingsService extends Service {
         initializeTestTe();
         initializeSunlightBoost();
         initializeGameBar();
+        initializeHaptics();
+    }
+
+    private void initializeHaptics() {
+        try {
+            OHapticsController.migrateLegacyProfile();
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to migrate haptic profile", e);
+        }
     }
 
     private void initializePdMode() {

@@ -211,20 +211,16 @@
         <item>2000</item>
     </string-array>
 
-    <!-- Haptic Profiles -->
-    <string-array name="haptic_profile_entries">
-        <item>@string/haptic_profile_op13gentle</item>
-        <item>@string/haptic_profile_op13crisp</item>
-        <item>@string/haptic_profile_yaap_gentle</item>
-        <item>@string/haptic_profile_yaap_crisp</item>
-        <item>@string/haptic_profile_richtap</item>
+    <!-- O-Haptics touch styles -->
+    <string-array name="haptic_style_entries">
+        <item>@string/haptic_style_crisp</item>
+        <item>@string/haptic_style_gentle</item>
+        <item>@string/haptic_style_richtap</item>
     </string-array>
 
-    <string-array name="haptic_profile_values" translatable="false">
-        <item>op13gentle</item>
-        <item>op13crisp</item>
-        <item>gentle</item>
+    <string-array name="haptic_style_values" translatable="false">
         <item>crisp</item>
+        <item>gentle</item>
         <item>richtap</item>
     </string-array>
 

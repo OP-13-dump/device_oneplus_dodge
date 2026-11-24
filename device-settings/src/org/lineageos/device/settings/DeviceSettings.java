@@ -26,7 +26,6 @@ import android.content.res.Resources;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
-import android.os.SystemProperties;
 import android.os.UserHandle;
 import android.text.TextUtils;
 import android.util.Log;
@@ -40,6 +39,7 @@ import androidx.preference.ListPreference;
 import androidx.preference.PreferenceGroup;
 import androidx.preference.PreferenceManager;
 import androidx.preference.Preference;
+import androidx.preference.SeekBarPreference;
 import androidx.preference.SwitchPreferenceCompat;
 
 import com.android.settingslib.widget.SettingsBasePreferenceFragment;
@@ -57,6 +57,7 @@ import org.lineageos.device.settings.display.HbmController;
 import org.lineageos.device.settings.display.PwmController;
 import org.lineageos.device.settings.display.SunlightBoostController;
 import org.lineageos.device.settings.fastcharge.FastChargeController;
+import org.lineageos.device.settings.haptics.OHapticsController;
 import org.lineageos.device.settings.utils.AppPreferencesHelper;
 import org.lineageos.device.settings.utils.FileUtils;
 import org.lineageos.device.settings.utils.PackageListAdapter.PackageItem;
@@ -80,7 +81,11 @@ public class DeviceSettings extends SettingsBasePreferenceFragment
     private SwitchPreferenceCompat mOnePulsePWMSwitch;
     private SwitchPreferenceCompat mHbmSwitch;
     private SwitchPreferenceCompat mSunlightBoostSwitch;
-    private ListPreference mHapticProfilePref;
+    private SwitchPreferenceCompat mSystemHapticsPref;
+    private SeekBarPreference mHapticIntensityPref;
+    private ListPreference mHapticStylePref;
+    private SwitchPreferenceCompat mKeyboardHapticsPref;
+    private SeekBarPreference mVibrationIntensityPref;
     private ListPreference mPdModePref;
     private ListPreference mChargingSpeedPref;
     private Preference mChargingStatusPref;
@@ -91,6 +96,7 @@ public class DeviceSettings extends SettingsBasePreferenceFragment
     private FastChargeController mFastChargeController;
     private PdModeController mPdModeController;
     private BypassChargingController mBypassChargingController;
+    private OHapticsController mOHaptics;
 
     private final Handler mChargingStatusHandler = new Handler(Looper.getMainLooper());
     private final Runnable mChargingStatusRunnable = new Runnable() {
@@ -169,13 +175,7 @@ public class DeviceSettings extends SettingsBasePreferenceFragment
 
         initNotificationSliderPreference();
 
-        mHapticProfilePref = (ListPreference) findPreference(Constants.KEY_HAPTIC_PROFILE);
-        if (mHapticProfilePref != null) {
-            String currentProfile = SystemProperties.get(Constants.PROP_HAPTIC_PROFILE, Constants.HAPTIC_PROFILE_DEFAULT);
-            mHapticProfilePref.setValue(currentProfile);
-            mHapticProfilePref.setSummary(mHapticProfilePref.getEntry());
-            mHapticProfilePref.setOnPreferenceChangeListener(this);
-        }
+        initOHapticsPreferences();
     }
 
     @Override
@@ -198,17 +198,105 @@ public class DeviceSettings extends SettingsBasePreferenceFragment
         updateChargingStatus();
         mChargingStatusHandler.removeCallbacks(mChargingStatusRunnable);
         mChargingStatusHandler.postDelayed(mChargingStatusRunnable, 1000);
-        if (mHapticProfilePref != null) {
-            String currentProfile = SystemProperties.get(Constants.PROP_HAPTIC_PROFILE, Constants.HAPTIC_PROFILE_DEFAULT);
-            mHapticProfilePref.setValue(currentProfile);
-            mHapticProfilePref.setSummary(mHapticProfilePref.getEntry());
-        }
+        updateOHapticsPreferences();
     }
 
     @Override
     public void onPause() {
         mChargingStatusHandler.removeCallbacks(mChargingStatusRunnable);
+        if (mOHaptics != null) {
+            mOHaptics.cancelPreview();
+        }
         super.onPause();
+    }
+
+    private void initOHapticsPreferences() {
+        mOHaptics = new OHapticsController(getContext());
+
+        mSystemHapticsPref = findPreference(Constants.KEY_SYSTEM_HAPTICS);
+        mHapticIntensityPref = findPreference(Constants.KEY_HAPTIC_INTENSITY);
+        mHapticStylePref = findPreference(Constants.KEY_HAPTIC_PROFILE);
+        mKeyboardHapticsPref = findPreference(Constants.KEY_KEYBOARD_HAPTICS);
+        mVibrationIntensityPref = findPreference(Constants.KEY_VIBRATION_INTENSITY);
+
+        if (mHapticIntensityPref != null) {
+            mHapticIntensityPref.setMin(0);
+            mHapticIntensityPref.setMax(
+                    OHapticsController.maxLevel(OHapticsController.TOUCH_STRENGTH_MIN));
+        }
+        if (mVibrationIntensityPref != null) {
+            mVibrationIntensityPref.setMin(0);
+            mVibrationIntensityPref.setMax(
+                    OHapticsController.maxLevel(OHapticsController.VIB_STRENGTH_MIN));
+        }
+
+        for (Preference pref : new Preference[] {mSystemHapticsPref, mHapticIntensityPref,
+                mHapticStylePref, mKeyboardHapticsPref, mVibrationIntensityPref}) {
+            if (pref != null) {
+                pref.setOnPreferenceChangeListener(this);
+            }
+        }
+
+        updateOHapticsPreferences();
+    }
+
+    private void updateOHapticsPreferences() {
+        if (mOHaptics == null) {
+            return;
+        }
+
+        boolean systemHaptics = mOHaptics.isSystemHapticsEnabled();
+        if (mSystemHapticsPref != null) {
+            mSystemHapticsPref.setChecked(systemHaptics);
+        }
+        if (mHapticIntensityPref != null) {
+            mHapticIntensityPref.setValue(OHapticsController.strengthToLevel(
+                    OHapticsController.getTouchStrength(),
+                    OHapticsController.TOUCH_STRENGTH_MIN));
+            mHapticIntensityPref.setEnabled(systemHaptics);
+        }
+        if (mHapticStylePref != null) {
+            mHapticStylePref.setValue(OHapticsController.getStyle());
+            mHapticStylePref.setSummary(mHapticStylePref.getEntry());
+            mHapticStylePref.setEnabled(systemHaptics);
+        }
+        if (mKeyboardHapticsPref != null) {
+            mKeyboardHapticsPref.setChecked(mOHaptics.isKeyboardHapticsEnabled());
+            mKeyboardHapticsPref.setEnabled(systemHaptics);
+        }
+        if (mVibrationIntensityPref != null) {
+            mVibrationIntensityPref.setValue(OHapticsController.strengthToLevel(
+                    OHapticsController.getVibrationStrength(),
+                    OHapticsController.VIB_STRENGTH_MIN));
+        }
+    }
+
+    private boolean onOHapticsPreferenceChange(Preference preference, Object newValue) {
+        if (preference == mSystemHapticsPref) {
+            mOHaptics.setSystemHapticsEnabled((Boolean) newValue);
+            updateOHapticsPreferences();
+        } else if (preference == mHapticIntensityPref) {
+            OHapticsController.setTouchStrength(OHapticsController.levelToStrength(
+                    (Integer) newValue, OHapticsController.TOUCH_STRENGTH_MIN));
+            mOHaptics.previewTouch();
+        } else if (preference == mHapticStylePref) {
+            String style = OHapticsController.normalizeStyle((String) newValue);
+            OHapticsController.setStyle(style);
+            int index = mHapticStylePref.findIndexOfValue(style);
+            if (index >= 0) {
+                mHapticStylePref.setSummary(mHapticStylePref.getEntries()[index]);
+            }
+            mOHaptics.previewStyle();
+        } else if (preference == mKeyboardHapticsPref) {
+            mOHaptics.setKeyboardHapticsEnabled((Boolean) newValue);
+        } else if (preference == mVibrationIntensityPref) {
+            OHapticsController.setVibrationStrength(OHapticsController.levelToStrength(
+                    (Integer) newValue, OHapticsController.VIB_STRENGTH_MIN));
+            mOHaptics.previewVibration();
+        } else {
+            return false;
+        }
+        return true;
     }
 
     /**
@@ -281,6 +369,10 @@ public class DeviceSettings extends SettingsBasePreferenceFragment
     @Override
     public boolean onPreferenceChange(Preference preference, Object newValue) {
         SharedPreferences sharedPrefs = PreferenceManager.getDefaultSharedPreferences(getContext());
+
+        if (onOHapticsPreferenceChange(preference, newValue)) {
+            return true;
+        }
 
         if (preference == mOnePulsePWMSwitch) {
             boolean enabled = (Boolean) newValue;
@@ -374,15 +466,6 @@ public class DeviceSettings extends SettingsBasePreferenceFragment
                 return notifySliderActionChange(1, (String) newValue);
             case Constants.KEY_NOTIF_SLIDER_ACTION_BOTTOM:
                 return notifySliderActionChange(2, (String) newValue);
-            case Constants.KEY_HAPTIC_PROFILE:
-                String profileValue = (String) newValue;
-                SystemProperties.set(Constants.PROP_HAPTIC_PROFILE, profileValue);
-                ListPreference hapticPref = (ListPreference) preference;
-                int index = hapticPref.findIndexOfValue(profileValue);
-                if (index >= 0) {
-                    hapticPref.setSummary(hapticPref.getEntries()[index]);
-                }
-                return true;
             default:
                 break;
         }

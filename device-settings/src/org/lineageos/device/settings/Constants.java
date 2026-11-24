@@ -186,8 +186,10 @@ public class Constants {
      *  (device_create "card%d-sde-crtc-%d"), unlike sm8550/sm8650's "sde-crtc-0". */
     public static final String NODE_MEASURED_FPS = "/sys/class/drm/card0-sde-crtc-0/measured_fps";
 
-    /* Haptic profile */
+    /* O-Haptics (see haptics/OHapticsController) */
+    public static final String KEY_SYSTEM_HAPTICS = "system_haptics";
+    public static final String KEY_HAPTIC_INTENSITY = "haptic_intensity";
     public static final String KEY_HAPTIC_PROFILE = "haptic_profile";
-    public static final String PROP_HAPTIC_PROFILE = "persist.sys.haptic_profile";
-    public static final String HAPTIC_PROFILE_DEFAULT = "op13crisp";
+    public static final String KEY_KEYBOARD_HAPTICS = "keyboard_haptics";
+    public static final String KEY_VIBRATION_INTENSITY = "vibration_intensity";
 }

@@ -275,15 +275,21 @@ Charge limit    Disabled</string>
     <!-- HBM/PWM tile messages -->
     <string name="hbm_unavailable_pwm_active">PWM is active</string>
 
-    <!-- Vibration & Haptics -->
-    <string name="vibration_category_title">Vibration &amp; Haptics</string>
-    <string name="haptic_profile_title">Haptic profile</string>
-    <string name="haptic_profile_summary">Select haptic feedback waveform profile</string>
-    <string name="haptic_profile_op13gentle">OnePlus 13 Gentle (Soft)</string>
-    <string name="haptic_profile_op13crisp">OnePlus 13 Crisp (Stock - Default)</string>
-    <string name="haptic_profile_yaap_gentle">YAAP Gentle</string>
-    <string name="haptic_profile_yaap_crisp">YAAP Crisp</string>
-    <string name="haptic_profile_richtap">RichTap Standard</string>
+    <!-- O-Haptics -->
+    <string name="ohaptics_title" translatable="false">O-Haptics</string>
+    <string name="ohaptics_summary">All-new haptics mimic the feel of real materials and natural interactions for a true-to-life, immersive experience.</string>
+    <string name="system_haptics_title">System haptics</string>
+    <string name="system_haptics_summary">Haptic feedback for touches, swipes and system controls</string>
+    <string name="haptic_intensity_title">Haptic intensity</string>
+    <string name="haptic_intensity_summary">Touches, gestures and keyboard</string>
+    <string name="haptic_style_title">How touches feel</string>
+    <string name="haptic_style_crisp">Crisp</string>
+    <string name="haptic_style_gentle">Gentle</string>
+    <string name="haptic_style_richtap">RichTap</string>
+    <string name="keyboard_haptics_title">Keypresses</string>
+    <string name="keyboard_haptics_summary">Vibrate when typing on the keyboard</string>
+    <string name="vibration_intensity_title">Vibration intensity</string>
+    <string name="vibration_intensity_summary">Calls, notifications and alarms</string>
 
     <!-- Generic -->
     <string name="delete">Delete</string>
