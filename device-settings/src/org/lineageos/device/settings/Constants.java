@@ -187,6 +187,7 @@ public class Constants {
     public static final String NODE_MEASURED_FPS = "/sys/class/drm/card0-sde-crtc-0/measured_fps";
 
     /* O-Haptics (see haptics/OHapticsController) */
+    public static final String KEY_OHAPTICS = "ohaptics";
     public static final String KEY_SYSTEM_HAPTICS = "system_haptics";
     public static final String KEY_HAPTIC_INTENSITY = "haptic_intensity";
     public static final String KEY_HAPTIC_PROFILE = "haptic_profile";

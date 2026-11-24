@@ -277,6 +277,11 @@ Charge limit    Disabled</string>
 
     <!-- O-Haptics -->
     <string name="ohaptics_title" translatable="false">O-Haptics</string>
+    <string name="haptics_category_title">Haptics</string>
+    <string name="ohaptics_entry_summary_on">On · %1$s</string>
+    <string name="ohaptics_entry_summary_off">System haptics off</string>
+    <string name="ohaptics_touch_category_title">Touch</string>
+    <string name="ohaptics_vibration_category_title">Vibration</string>
     <string name="ohaptics_summary">All-new haptics mimic the feel of real materials and natural interactions for a true-to-life, immersive experience.</string>
     <string name="system_haptics_title">System haptics</string>
     <string name="system_haptics_summary">Haptic feedback for touches, swipes and system controls</string>

@@ -132,6 +132,12 @@
                 android:resource="@string/bypass_charging_summary" />
         </activity>
 
+        <!-- O-Haptics -->
+        <activity android:name=".haptics.OHapticsActivity"
+            android:label="@string/ohaptics_title"
+            android:theme="@style/Theme.SubSettingsBase.Expressive"
+            android:exported="false" />
+
         <!-- Charging boost from the SystemUI charging ring -->
         <receiver android:name=".fastcharge.FastChargeBoostReceiver"
             android:permission="android.permission.STATUS_BAR_SERVICE"

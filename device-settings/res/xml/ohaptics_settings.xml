@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+     SPDX-FileCopyrightText: The LineageOS Project
+     SPDX-License-Identifier: Apache-2.0
+-->
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:title="@string/ohaptics_title">
+
+    <Preference
+        android:key="ohaptics_intro"
+        android:icon="@drawable/ic_vibration"
+        android:summary="@string/ohaptics_summary"
+        android:persistent="false"
+        android:selectable="false" />
+
+    <PreferenceCategory
+        android:key="ohaptics_touch_category"
+        android:title="@string/ohaptics_touch_category_title">
+
+        <SwitchPreferenceCompat
+            android:key="system_haptics"
+            android:title="@string/system_haptics_title"
+            android:summary="@string/system_haptics_summary"
+            android:persistent="false" />
+
+        <SeekBarPreference
+            android:key="haptic_intensity"
+            android:title="@string/haptic_intensity_title"
+            android:summary="@string/haptic_intensity_summary"
+            android:persistent="false"
+            android:max="16"
+            app:min="0"
+            app:seekBarIncrement="1"
+            app:showSeekBarValue="false"
+            app:updatesContinuously="false" />
+
+        <ListPreference
+            android:key="haptic_profile"
+            android:title="@string/haptic_style_title"
+            android:dialogTitle="@string/haptic_style_title"
+            android:entries="@array/haptic_style_entries"
+            android:entryValues="@array/haptic_style_values"
+            android:persistent="false"
+            android:summary="%s" />
+
+        <SwitchPreferenceCompat
+            android:key="keyboard_haptics"
+            android:title="@string/keyboard_haptics_title"
+            android:summary="@string/keyboard_haptics_summary"
+            android:persistent="false" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        android:key="ohaptics_vibration_category"
+        android:title="@string/ohaptics_vibration_category_title">
+
+        <SeekBarPreference
+            android:key="vibration_intensity"
+            android:title="@string/vibration_intensity_title"
+            android:summary="@string/vibration_intensity_summary"
+            android:persistent="false"
+            android:max="17"
+            app:min="0"
+            app:seekBarIncrement="1"
+            app:showSeekBarValue="false"
+            app:updatesContinuously="false" />
+
+    </PreferenceCategory>
+
+</PreferenceScreen>
