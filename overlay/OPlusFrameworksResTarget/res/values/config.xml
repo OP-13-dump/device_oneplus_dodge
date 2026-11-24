@@ -391,4 +391,7 @@
 
     <!-- Whether to enable Smart 5G in device -->
     <bool name="config_supportSmart5G">true</bool>
+
+    <!-- O-Haptics: stock OxygenOS waveform for each haptic feedback constant -->
+    <string name="config_hapticFeedbackCustomizationFile" translatable="false">/vendor/etc/haptic_feedback_customization.xml</string>
 </resources>

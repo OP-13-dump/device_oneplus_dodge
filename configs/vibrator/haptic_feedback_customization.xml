@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+     SPDX-FileCopyrightText: The LineageOS Project
+     SPDX-License-Identifier: Apache-2.0
+
+     O-Haptics: play the waveform stock OxygenOS uses for each haptic feedback
+     constant. Stock overrides the constants in
+     OplusHapticFeedbackVibrationProvider (oplus-services.jar) with its own
+     effect ids, which effect2waveform.xml maps to /odm/etc/vibrator bins. The
+     dodge effect lib keeps those bins in AOSP predefined-effect slots:
+
+       slot            stock waveform
+       click           2    weak short vibrate (system click)
+       double_click    46   moderate short vibrate twice
+       tick            2    weak short vibrate
+       thud            3    moderate short vibrate
+       heavy_click     5
+       texture_tick    1    weakest short vibrate
+       ringtone_1      7    weak granular
+       ringtone_2      56   long vibrate
+       ringtone_3      310  virtual key feedback
+
+     Constants are only listed when AOSP's default effect would land on a
+     different waveform than stock; e.g. CONFIRM (click), REJECT
+     (double_click), CLOCK_TICK and TEXT_HANDLE_MOVE (texture_tick), or
+     DRAG_START (heavy_click) already match.
+-->
+<haptic-feedback-constants>
+    <!-- LONG_PRESS: stock effect 1 -->
+    <constant id="0">
+        <vibration-effect><predefined-effect name="click"/></vibration-effect>
+    </constant>
+    <!-- VIRTUAL_KEY: stock effect 368 (LuXun motor) -->
+    <constant id="1">
+        <vibration-effect><predefined-effect name="ringtone_3"/></vibration-effect>
+    </constant>
+    <!-- KEYBOARD_TAP: stock effect 1 -->
+    <constant id="3">
+        <vibration-effect><predefined-effect name="click"/></vibration-effect>
+    </constant>
+    <!-- CALENDAR_DATE: stock effect 2 -->
+    <constant id="5">
+        <vibration-effect><predefined-effect name="thud"/></vibration-effect>
+    </constant>
+    <!-- CONTEXT_CLICK: stock effect 0 -->
+    <constant id="6">
+        <vibration-effect><predefined-effect name="texture_tick"/></vibration-effect>
+    </constant>
+    <!-- KEYBOARD_RELEASE: stock effect 1 -->
+    <constant id="7">
+        <vibration-effect><predefined-effect name="click"/></vibration-effect>
+    </constant>
+    <!-- EDGE_SQUEEZE: stock effect 68 -->
+    <constant id="14">
+        <vibration-effect><predefined-effect name="ringtone_1"/></vibration-effect>
+    </constant>
+    <!-- TOGGLE_ON: stock has no compose(), so AOSP falls back to TICK -->
+    <constant id="21">
+        <vibration-effect><predefined-effect name="tick"/></vibration-effect>
+    </constant>
+    <!-- TOGGLE_OFF: AOSP fallback TEXTURE_TICK -->
+    <constant id="22">
+        <vibration-effect><predefined-effect name="texture_tick"/></vibration-effect>
+    </constant>
+    <!-- GESTURE_THRESHOLD_DEACTIVATE: AOSP fallback TEXTURE_TICK -->
+    <constant id="24">
+        <vibration-effect><predefined-effect name="texture_tick"/></vibration-effect>
+    </constant>
+    <!-- SAFE_MODE_ENABLED: stock effect 70 -->
+    <constant id="10001">
+        <vibration-effect><predefined-effect name="ringtone_2"/></vibration-effect>
+    </constant>
+    <!-- ASSISTANT_BUTTON: AOSP fallback HEAVY_CLICK -->
+    <constant id="10002">
+        <vibration-effect><predefined-effect name="heavy_click"/></vibration-effect>
+    </constant>
+</haptic-feedback-constants>

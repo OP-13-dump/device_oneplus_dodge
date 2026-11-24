@@ -104,20 +104,23 @@ PRODUCT_PACKAGES += \
     vendor.qti.hardware.vibrator.service.oplus_sm8750
 
 PRODUCT_COPY_FILES += \
-    $(LOCAL_PATH)/configs/vibrator/excluded-input-devices.xml:$(TARGET_COPY_OUT_VENDOR)/etc/excluded-input-devices.xml
+    $(LOCAL_PATH)/configs/vibrator/excluded-input-devices.xml:$(TARGET_COPY_OUT_VENDOR)/etc/excluded-input-devices.xml \
+    $(LOCAL_PATH)/configs/vibrator/haptic_feedback_customization.xml:$(TARGET_COPY_OUT_VENDOR)/etc/haptic_feedback_customization.xml
 
-# Vibrator (YAAP sm8650-common style profiles)
-# sm8750-common QTI HAL + dodge effect lib. Profiles via persist.sys.haptic_profile:
-#   richtap | crisp | gentle | op13crisp (default) | op13gentle
-# op13crisp/op13gentle = dodge stock def/soft from odm/etc/vibrator/9999/{def,soft}.
-# Stock OOS uses def_style; op13gentle is the weaker soft_style.
+# Vibrator (O-Haptics)
+# sm8750-common QTI HAL + dodge effect lib, which plays the stock OOS waveforms
+# from /odm/etc/vibrator. Set from DeviceSettings > O-Haptics:
+#   persist.sys.haptic_profile         crisp (default, stock def_style) | gentle (soft_style) | richtap
+#   persist.sys.haptic_touch_strength  800..2400, default 2000 (touch haptics)
+#   persist.sys.haptic_vib_strength    700..2400, default 2400 (calls, notifications, alarms)
+# haptic_feedback_customization.xml maps HapticFeedbackConstants to the stock waveforms.
 $(call soong_config_set,qti_vibrator,effect_lib,libqtivibratoreffect.oplus.dodge)
 
 PRODUCT_PACKAGES += \
     libqtivibratoreffect.oplus.dodge
 
 PRODUCT_PRODUCT_PROPERTIES += \
-    persist.sys.haptic_profile=op13crisp
+    persist.sys.haptic_profile=crisp
 
 # Inherit from the common OEM chipset makefile.
 $(call inherit-product, device/oneplus/sm8750-common/common.mk)
