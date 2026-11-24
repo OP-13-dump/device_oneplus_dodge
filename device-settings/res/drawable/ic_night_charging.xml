@@ -1,7 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
 <!--
-  SPDX-FileCopyrightText: 2026 AlphaDroid
-  SPDX-License-Identifier: Apache-2.0
-  -->
+     SPDX-FileCopyrightText: The LineageOS Project
+     SPDX-License-Identifier: Apache-2.0
+-->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"
     android:height="24dp"
@@ -9,6 +10,9 @@
     android:viewportHeight="24"
     android:tint="?android:attr/colorControlNormal">
     <path
-        android:fillColor="@android:color/white"
-        android:pathData="M12,3C7.03,3 3,7.03 3,12C3,16.97 7.03,21 12,21C15.17,21 17.96,19.36 19.56,16.88C15.6,17.42 12.06,14.34 12.06,10.34C12.06,8.04 13.23,6.01 15.01,4.82C14.06,4.29 13.06,3.99 12,3Z" />
+        android:pathData="M20,14.5A8,8 0 1,1 9.5,4A6.5,6.5 0 0,0 20,14.5Z"
+        android:strokeColor="@android:color/white"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
 </vector>

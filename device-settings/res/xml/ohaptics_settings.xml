@@ -7,12 +7,9 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:title="@string/ohaptics_title">
 
-    <Preference
+    <com.android.settingslib.widget.TopIntroPreference
         android:key="ohaptics_intro"
-        android:icon="@drawable/ic_vibration"
-        android:summary="@string/ohaptics_summary"
-        android:persistent="false"
-        android:selectable="false" />
+        android:title="@string/ohaptics_summary" />
 
     <PreferenceCategory
         android:key="ohaptics_touch_category"
@@ -24,7 +21,7 @@
             android:summary="@string/system_haptics_summary"
             android:persistent="false" />
 
-        <SeekBarPreference
+        <com.android.settingslib.widget.SliderPreference
             android:key="haptic_intensity"
             android:title="@string/haptic_intensity_title"
             android:summary="@string/haptic_intensity_summary"
@@ -32,17 +29,8 @@
             android:max="16"
             app:min="0"
             app:seekBarIncrement="1"
-            app:showSeekBarValue="false"
-            app:updatesContinuously="false" />
-
-        <ListPreference
-            android:key="haptic_profile"
-            android:title="@string/haptic_style_title"
-            android:dialogTitle="@string/haptic_style_title"
-            android:entries="@array/haptic_style_entries"
-            android:entryValues="@array/haptic_style_values"
-            android:persistent="false"
-            android:summary="%s" />
+            app:textStart="@string/ohaptics_intensity_light"
+            app:textEnd="@string/ohaptics_intensity_strong" />
 
         <SwitchPreferenceCompat
             android:key="keyboard_haptics"
@@ -53,10 +41,20 @@
     </PreferenceCategory>
 
     <PreferenceCategory
+        android:key="ohaptics_style_category"
+        android:title="@string/haptic_style_title">
+
+        <com.android.settingslib.widget.SegmentedButtonPreference
+            android:key="haptic_profile"
+            android:persistent="false" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory
         android:key="ohaptics_vibration_category"
         android:title="@string/ohaptics_vibration_category_title">
 
-        <SeekBarPreference
+        <com.android.settingslib.widget.SliderPreference
             android:key="vibration_intensity"
             android:title="@string/vibration_intensity_title"
             android:summary="@string/vibration_intensity_summary"
@@ -64,8 +62,8 @@
             android:max="17"
             app:min="0"
             app:seekBarIncrement="1"
-            app:showSeekBarValue="false"
-            app:updatesContinuously="false" />
+            app:textStart="@string/ohaptics_intensity_light"
+            app:textEnd="@string/ohaptics_intensity_strong" />
 
     </PreferenceCategory>
 

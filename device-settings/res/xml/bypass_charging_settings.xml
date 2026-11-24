@@ -2,16 +2,14 @@
 <PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:settings="http://schemas.android.com/apk/res-auto">
 
+    <com.android.settingslib.widget.MainSwitchPreference
+        android:key="bypass_charging"
+        android:title="@string/bypass_charging_title"
+        android:persistent="false" />
+
     <PreferenceCategory
         android:key="bypass_charging_category"
         android:title="@string/bypass_charging_category_title">
-
-        <SwitchPreferenceCompat
-            android:key="bypass_charging"
-            android:title="@string/bypass_charging_title"
-            android:icon="@drawable/ic_bypass_charging"
-            android:summary="@string/bypass_charging_summary"
-            android:persistent="false" />
 
         <org.lineageos.device.settings.preferences.CustomSeekBarPreference
             android:key="bypass_charging_target"

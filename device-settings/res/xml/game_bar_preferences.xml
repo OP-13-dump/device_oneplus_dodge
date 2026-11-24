@@ -21,22 +21,22 @@
     xmlns:settings="http://schemas.android.com/apk/res/org.lineageos.device.settings">
 
     <!-- Master Enable -->
-    <SwitchPreferenceCompat
+    <com.android.settingslib.widget.MainSwitchPreference
         android:key="game_bar_enable"
         android:title="@string/game_bar_enable"
-        android:summary="@string/game_bar_enable_summary"
         android:defaultValue="false" />
 
     <!-- Applications -->
     <PreferenceCategory
         android:key="game_bar_applications"
-        android:title="@string/game_bar_applications" />
+        android:title="@string/game_bar_applications">
 
-    <Preference
-        android:key="game_bar_add_packages"
-        android:icon="@drawable/ic_add"
-        android:title="@string/add_app"
-        android:summary="@string/game_bar_add_packages_summary" />
+        <Preference
+            android:key="game_bar_add_packages"
+            android:icon="@drawable/ic_add"
+            android:title="@string/add_app"
+            android:summary="@string/game_bar_add_packages_summary" />
+    </PreferenceCategory>
 
     <!-- Stats Display -->
     <PreferenceCategory

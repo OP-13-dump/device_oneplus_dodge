@@ -7,27 +7,37 @@ package org.lineageos.device.settings.haptics;
 
 import android.os.Bundle;
 
-import androidx.preference.ListPreference;
 import androidx.preference.Preference;
-import androidx.preference.SeekBarPreference;
 import androidx.preference.SwitchPreferenceCompat;
 
+import com.android.settingslib.widget.SegmentedButtonPreference;
 import com.android.settingslib.widget.SettingsBasePreferenceFragment;
+import com.android.settingslib.widget.SliderPreference;
 
 import org.lineageos.device.settings.Constants;
 import org.lineageos.device.settings.R;
+
+import java.util.Arrays;
+import java.util.List;
 
 /** The O-Haptics page: touch haptics, touch style and vibration intensity. */
 public class OHapticsFragment extends SettingsBasePreferenceFragment
         implements Preference.OnPreferenceChangeListener {
 
+    private static final int[] STYLE_ICONS = {
+        R.drawable.ic_haptic_style_crisp,
+        R.drawable.ic_haptic_style_gentle,
+        R.drawable.ic_haptic_style_richtap,
+    };
+
     private OHapticsController mOHaptics;
+    private List<String> mStyleValues;
 
     private SwitchPreferenceCompat mSystemHapticsPref;
-    private SeekBarPreference mHapticIntensityPref;
-    private ListPreference mHapticStylePref;
+    private SliderPreference mHapticIntensityPref;
+    private SegmentedButtonPreference mHapticStylePref;
     private SwitchPreferenceCompat mKeyboardHapticsPref;
-    private SeekBarPreference mVibrationIntensityPref;
+    private SliderPreference mVibrationIntensityPref;
 
     @Override
     public void onCreatePreferences(Bundle savedInstanceState, String rootKey) {
@@ -52,8 +62,26 @@ public class OHapticsFragment extends SettingsBasePreferenceFragment
                     OHapticsController.maxLevel(OHapticsController.VIB_STRENGTH_MIN));
         }
 
+        mStyleValues = Arrays.asList(getResources().getStringArray(R.array.haptic_style_values));
+        if (mHapticStylePref != null) {
+            String[] entries = getResources().getStringArray(R.array.haptic_style_entries);
+            for (int i = 0; i < entries.length; i++) {
+                mHapticStylePref.setUpButton(i, entries[i], STYLE_ICONS[i]);
+                mHapticStylePref.setButtonVisibility(i, true);
+            }
+            mHapticStylePref.setOnButtonClickListener((group, checkedId, isChecked) -> {
+                if (!isChecked) {
+                    return;
+                }
+                int index = group.indexOfChild(group.findViewById(checkedId));
+                if (index >= 0 && index < mStyleValues.size()) {
+                    onStyleSelected(index);
+                }
+            });
+        }
+
         for (Preference pref : new Preference[] {mSystemHapticsPref, mHapticIntensityPref,
-                mHapticStylePref, mKeyboardHapticsPref, mVibrationIntensityPref}) {
+                mKeyboardHapticsPref, mVibrationIntensityPref}) {
             if (pref != null) {
                 pref.setOnPreferenceChangeListener(this);
             }
@@ -86,8 +114,11 @@ public class OHapticsFragment extends SettingsBasePreferenceFragment
             mHapticIntensityPref.setEnabled(systemHaptics);
         }
         if (mHapticStylePref != null) {
-            mHapticStylePref.setValue(OHapticsController.getStyle());
-            mHapticStylePref.setSummary(mHapticStylePref.getEntry());
+            mHapticStylePref.setCheckedIndex(
+                    Math.max(mStyleValues.indexOf(OHapticsController.getStyle()), 0));
+            for (int i = 0; i < mStyleValues.size(); i++) {
+                mHapticStylePref.setButtonEnabled(i, systemHaptics);
+            }
             mHapticStylePref.setEnabled(systemHaptics);
         }
         if (mKeyboardHapticsPref != null) {
@@ -101,6 +132,16 @@ public class OHapticsFragment extends SettingsBasePreferenceFragment
         }
     }
 
+    private void onStyleSelected(int index) {
+        String style = mStyleValues.get(index);
+        if (style.equals(OHapticsController.getStyle())) {
+            return;
+        }
+        OHapticsController.setStyle(style);
+        mHapticStylePref.setCheckedIndex(index);
+        mOHaptics.previewStyle();
+    }
+
     @Override
     public boolean onPreferenceChange(Preference preference, Object newValue) {
         if (preference == mSystemHapticsPref) {
@@ -110,14 +151,6 @@ public class OHapticsFragment extends SettingsBasePreferenceFragment
             OHapticsController.setTouchStrength(OHapticsController.levelToStrength(
                     (Integer) newValue, OHapticsController.TOUCH_STRENGTH_MIN));
             mOHaptics.previewTouch();
-        } else if (preference == mHapticStylePref) {
-            String style = OHapticsController.normalizeStyle((String) newValue);
-            OHapticsController.setStyle(style);
-            int index = mHapticStylePref.findIndexOfValue(style);
-            if (index >= 0) {
-                mHapticStylePref.setSummary(mHapticStylePref.getEntries()[index]);
-            }
-            mOHaptics.previewStyle();
         } else if (preference == mKeyboardHapticsPref) {
             mOHaptics.setKeyboardHapticsEnabled((Boolean) newValue);
         } else if (preference == mVibrationIntensityPref) {

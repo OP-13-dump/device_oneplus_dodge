@@ -12,9 +12,10 @@ import android.widget.ListView;
 
 import androidx.appcompat.app.AlertDialog;
 import androidx.preference.Preference;
-import androidx.preference.PreferenceFragmentCompat;
 import androidx.preference.PreferenceGroup;
 import androidx.preference.TwoStatePreference;
+
+import com.android.settingslib.widget.SettingsBasePreferenceFragment;
 
 import org.lineageos.device.settings.Constants;
 import org.lineageos.device.settings.R;
@@ -26,7 +27,7 @@ import org.lineageos.device.settings.utils.AppListManager;
 
 import java.util.HashSet;
 
-public class BypassChargingFragment extends PreferenceFragmentCompat {
+public class BypassChargingFragment extends SettingsBasePreferenceFragment {
 
     private static final String BYPASS_CHARGING_ADD_PACKAGES = "bypass_charging_add_packages";
     private static final String BYPASS_CHARGING_APPLICATIONS = "bypass_charging_applications";
@@ -69,7 +70,7 @@ public class BypassChargingFragment extends PreferenceFragmentCompat {
                     return true;
                 });
             } else {
-                mBypassPreference.setSummary(R.string.bypass_charging_unavailable);
+                mBypassPreference.setTitle(R.string.bypass_charging_unavailable);
             }
         }
 

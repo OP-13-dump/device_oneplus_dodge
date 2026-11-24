@@ -1,20 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+     SPDX-FileCopyrightText: The LineageOS Project
+     SPDX-License-Identifier: Apache-2.0
+-->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"
-    android:height="30dp"
-    android:viewportWidth="32"
-    android:viewportHeight="40"
+    android:height="24dp"
+    android:viewportWidth="960"
+    android:viewportHeight="960"
     android:tint="?android:attr/colorControlNormal">
-
     <path
         android:fillColor="@android:color/white"
-        android:pathData="M23,18a6,6 0,1 0,-6 -6A6,6 0,0 0,23 18ZM22,10a1,1 0,0 1,2 0v1.38l1.45,0.73a1,1 0,0 1,0.44 1.34A1,1 0,0 1,25 14a0.93,0.93 0,0 1,-0.45 -0.11l-2,-1A1,1 0,0 1,22 12Z" />
-
-    <path
-        android:fillColor="@android:color/white"
-        android:pathData="M2,17v4a1,1 0,0 0,1 1H4V16H3A1,1 0,0 0,2 17Z" />
-
-    <path
-        android:fillColor="@android:color/white"
-        android:pathData="M23,20a8,8 0,0 1,-8 -8H8a2,2 0,0 0,-2 2V24a2,2 0,0 0,2 2H28a2,2 0,0 0,2 -2V15.86A8,8 0,0 1,23 20Z" />
-
+        android:pathData="M200,880Q183,880 171.5,868.5Q160,857 160,840Q160,823 171.5,811.5Q183,800 200,800L240,800L240,680Q240,619 268.5,565.5Q297,512 348,480Q297,448 268.5,394.5Q240,341 240,280L240,160L200,160Q183,160 171.5,148.5Q160,137 160,120Q160,103 171.5,91.5Q183,80 200,80L760,80Q777,80 788.5,91.5Q800,103 800,120Q800,137 788.5,148.5Q777,160 760,160L720,160L720,280Q720,341 691.5,394.5Q663,448 612,480Q663,512 691.5,565.5Q720,619 720,680L720,800L760,800Q777,800 788.5,811.5Q800,823 800,840Q800,857 788.5,868.5Q777,880 760,880L200,880Z" />
 </vector>

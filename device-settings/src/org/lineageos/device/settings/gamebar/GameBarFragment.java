@@ -26,10 +26,12 @@ import android.widget.ListView;
 import androidx.appcompat.app.AlertDialog;
 import androidx.preference.ListPreference;
 import androidx.preference.Preference;
-import androidx.preference.PreferenceFragmentCompat;
 import androidx.preference.PreferenceGroup;
 import androidx.preference.PreferenceManager;
 import androidx.preference.SwitchPreferenceCompat;
+import androidx.preference.TwoStatePreference;
+
+import com.android.settingslib.widget.SettingsBasePreferenceFragment;
 
 import org.lineageos.device.settings.Constants;
 import org.lineageos.device.settings.R;
@@ -40,7 +42,7 @@ import org.lineageos.device.settings.utils.AppListManager;
 
 import java.util.HashSet;
 
-public class GameBarFragment extends PreferenceFragmentCompat {
+public class GameBarFragment extends SettingsBasePreferenceFragment {
 
     private GameBar mGameBar;
     private SwitchPreferenceCompat mFpsSwitch;
@@ -106,7 +108,7 @@ public class GameBarFragment extends PreferenceFragmentCompat {
         }
 
         // Master enable
-        SwitchPreferenceCompat enableSwitch = findPreference("game_bar_enable");
+        TwoStatePreference enableSwitch = findPreference("game_bar_enable");
         if (enableSwitch != null) {
             enableSwitch.setOnPreferenceChangeListener((pref, newValue) -> {
                 boolean enabled = (boolean) newValue;

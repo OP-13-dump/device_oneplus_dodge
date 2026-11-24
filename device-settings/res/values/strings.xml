@@ -140,10 +140,6 @@ Charge limit    Disabled</string>
     <string name="bc_mode_list">Bypass mode: bypass list</string>
 
     <!-- Custom seekbar -->
-    <string name="custom_seekbar_value">Value: <xliff:g id="v">%s</xliff:g></string>
-    <string name="custom_seekbar_default_value">by default</string>
-    <string name="custom_seekbar_default_value_to_set">Default value: <xliff:g id="v">%s</xliff:g>\nLong tap to set</string>
-    <string name="custom_seekbar_default_value_is_set">Default value is set</string>
 
     <!-- GameBar -->
     <string name="game_bar_title">GameBar</string>
@@ -155,7 +151,6 @@ Charge limit    Disabled</string>
     <string name="game_bar_tile_description">Toggle the game overlay</string>
     <string name="game_bar_overlay_features_title">Overlay Features</string>
     <string name="game_bar_enable">Enable GameBar Overlay</string>
-    <string name="game_bar_enable_summary">Show performance metrics overlay in-game</string>
     <string name="game_bar_stats_display">Stats Display</string>
     <string name="game_bar_fps_enable">FPS</string>
     <string name="game_bar_fps_enable_summary">Show current frames per second</string>
@@ -281,6 +276,8 @@ Charge limit    Disabled</string>
     <string name="ohaptics_entry_summary_on">On · %1$s</string>
     <string name="ohaptics_entry_summary_off">System haptics off</string>
     <string name="ohaptics_touch_category_title">Touch</string>
+    <string name="ohaptics_intensity_light">Light</string>
+    <string name="ohaptics_intensity_strong">Strong</string>
     <string name="ohaptics_vibration_category_title">Vibration</string>
     <string name="ohaptics_summary">All-new haptics mimic the feel of real materials and natural interactions for a true-to-life, immersive experience.</string>
     <string name="system_haptics_title">System haptics</string>
@@ -295,6 +292,9 @@ Charge limit    Disabled</string>
     <string name="keyboard_haptics_summary">Vibrate when typing on the keyboard</string>
     <string name="vibration_intensity_title">Vibration intensity</string>
     <string name="vibration_intensity_summary">Calls, notifications and alarms</string>
+
+    <!-- Slider -->
+    <string name="custom_seekbar_reset">Reset to default</string>
 
     <!-- Generic -->
     <string name="delete">Delete</string>
