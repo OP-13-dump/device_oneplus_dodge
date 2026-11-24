@@ -322,9 +322,16 @@ int16_t scale_effect_magnitude(uint32_t kind, int16_t magnitude, float amplitude
             return toMagnitude(touch * magnitude / kMagnitudeMedium);
         }
         case EFFECT_PLAY_PRIMITIVE: {
+            /* Scale the primitive linearly. The QTI magnitude starts at 50% for
+             * scale 0, which turns near-silent ramps (e.g. Launcher's Circle to
+             * Search hint: 50 LOW_TICKs from scale 0 to 1, started on every nav
+             * handle touch) into a rattle at the start of every swipe. */
             const float touch = strengthRatio(kPropTouchStrength, kTouchStrengthMin,
                                               kTouchStrengthDefault);
-            return toMagnitude(touch * magnitude / kMagnitudeMax);
+            const float scale = amplitude < 0.0f
+                    ? static_cast<float>(magnitude) / kMagnitudeMax
+                    : std::clamp(amplitude, 0.0f, 1.0f);
+            return toMagnitude(touch * scale);
         }
         case EFFECT_PLAY_ON_SHORT: {
             /* Stock converts the step amplitude to strength * 2400, floored at
