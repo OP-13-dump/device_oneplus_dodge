@@ -20,6 +20,10 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:settings="http://schemas.android.com/apk/res/org.lineageos.device.settings">
 
+    <com.android.settingslib.widget.TopIntroPreference
+        android:key="game_bar_intro"
+        android:title="@string/game_bar_intro" />
+
     <!-- Master Enable -->
     <com.android.settingslib.widget.MainSwitchPreference
         android:key="game_bar_enable"

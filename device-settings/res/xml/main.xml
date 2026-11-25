@@ -126,7 +126,11 @@
             android:icon="@drawable/ic_bypass_charging"
             android:title="@string/bypass_charging_title"
             android:summary="@string/bypass_charging_summary"
-            android:fragment="org.lineageos.device.settings.bypasschrg.BypassChargingFragment" />
+            android:persistent="false">
+            <intent
+                android:targetPackage="org.lineageos.device.settings"
+                android:targetClass="org.lineageos.device.settings.bypasschrg.BypassChargingActivity" />
+        </Preference>
 
         <ListPreference
             android:key="pd_mode"
@@ -167,6 +171,10 @@
             android:icon="@drawable/ic_game_bar"
             android:title="@string/game_bar_title"
             android:summary="@string/game_bar_summary"
-            android:fragment="org.lineageos.device.settings.gamebar.GameBarFragment" />
+            android:persistent="false">
+            <intent
+                android:targetPackage="org.lineageos.device.settings"
+                android:targetClass="org.lineageos.device.settings.gamebar.GameBarSettingsActivity" />
+        </Preference>
     </PreferenceCategory>
 </PreferenceScreen>

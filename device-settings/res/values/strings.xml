@@ -144,6 +144,7 @@ Charge limit    Disabled</string>
     <!-- GameBar -->
     <string name="game_bar_title">GameBar</string>
     <string name="game_bar_summary">Enable the system overlay (FPS, Temp, etc.)</string>
+    <string name="game_bar_intro">Show a live overlay with FPS, temperatures and CPU, GPU and memory usage while you play, so you can keep an eye on how your games are running.</string>
     <string name="overlay_permission_required">Overlay permission is required</string>
     <string name="overlay_permission_granted">Overlay permission granted</string>
     <string name="overlay_permission_denied">Overlay permission denied</string>
