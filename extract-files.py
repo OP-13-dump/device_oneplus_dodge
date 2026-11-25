@@ -134,7 +134,64 @@ def set_super_text_not_support(ctx, file, file_path, *args, **kwargs):
     ):
         update_vendor_tag(ctx, file, file_path, tag, "0")
 
+# The generated thermal-engine.conf (stock global gears on horae's status model)
+# caps the CPUs from 35 C shell temp and only clears below 33 C. Hand-held idle
+# already reads ~35 C, which pinned the primes at 1689600 almost permanently.
+# Dodge table: from 37 C only the top prime bins (>3513600) are trimmed, since
+# they cost the most power for the least speed; the real caps start at 39 C,
+# and every step clears 2 C below its own trip. Top levels keep stock's severity.
+# (trip mC, clear mC, cpu-cluster0 kHz, cpu-cluster1 kHz, gpu Hz)
+NO_LIMIT = 2147483647
+DODGE_THERMAL_LEVELS = [
+    (37000, 35000, NO_LIMIT, 3513600, NO_LIMIT),
+    (39000, 37000, 2745600, 3072000, NO_LIMIT),
+    (41000, 39000, 2400000, 2841600, NO_LIMIT),
+    (43000, 41000, 2227200, 2246400, NO_LIMIT),
+    (45000, 43000, 1996800, 1689600, 832000000),
+    (47000, 45000, 1785600, 1401600, 734000000),
+    (49000, 47000, 1555200, 1401600, 660000000),
+    (51000, 49000, 1363200, 1017600, 607000000),
+    (53000, 51000, 1152000, 1017600, 525000000),
+    (55000, 53000, 960000, 1017600, 389000000),
+]
+
+def retune_thermal_engine_conf(ctx, file, file_path, *args, **kwargs):
+    """Replace every monitor section's levels with DODGE_THERMAL_LEVELS."""
+    with open(file_path, 'r', encoding='utf-8') as f:
+        sections = [s for s in f.read().strip().split('\n\n') if s.strip()]
+
+    out = []
+    for section in sections:
+        lines = section.strip().split('\n')
+        name = lines[0].strip('[]')
+        if 'algo_type monitor' not in lines:
+            out.append('\n'.join(lines))
+            continue
+        # The generator splits >12 levels into <sensor>-1, -2...; one is enough.
+        if not name.endswith('-0'):
+            continue
+
+        actions = next(l for l in lines if l.startswith('actions ')).split()[1]
+        if actions != 'cpu-cluster0+cpu-cluster1+gpu':
+            raise ValueError(f'{name}: unexpected thermal actions {actions}')
+
+        keep = [l for l in lines if not l.startswith(
+            ('thresholds ', 'thresholds_clr ', 'actions ', 'action_info '))]
+        keep += [
+            'thresholds ' + ' '.join(str(l[0]) for l in DODGE_THERMAL_LEVELS),
+            'thresholds_clr ' + ' '.join(str(l[1]) for l in DODGE_THERMAL_LEVELS),
+            'actions ' + ' '.join([actions] * len(DODGE_THERMAL_LEVELS)),
+            'action_info ' + ' '.join(
+                '+'.join(map(str, l[2:])) for l in DODGE_THERMAL_LEVELS),
+        ]
+        out.append('\n'.join(keep))
+
+    with open(file_path, 'w', encoding='utf-8') as f:
+        f.write('\n\n'.join(out) + '\n')
+
 blob_fixups: blob_fixups_user_type = {
+    'vendor/etc/thermal-engine.conf': blob_fixup()
+        .call(retune_thermal_engine_conf, need_tmp_dir=False),
     'odm/etc/resourcemanager.xml': blob_fixup()
         .regex_replace(
             r'(<name>PAL_STREAM_VOIP_TX</name>\s*<policies>\s*<ec_ref>\s*)(?!\s*<disabled_stream>PAL_STREAM_LOW_LATENCY)',
